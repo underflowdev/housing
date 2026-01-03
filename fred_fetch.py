@@ -3,7 +3,7 @@ import time
 
 
 fred_base = 'https://api.stlouisfed.org/fred/release/tables'
-api_key = "fill something in here"
+api_key = "put your api key here"
 file_type = 'json'
 include_observation_values = 'true'
 
@@ -78,8 +78,8 @@ states = [
     {'key': '269251', 'name': 'Wyoming'}
 ]
 
-start_date = 1965
-end_date = 2021
+start_date = 2001
+end_date = 2025
 dates = []
 while start_date < end_date:
     dates.append(f'{str(start_date)}-01-01')

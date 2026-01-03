@@ -10,7 +10,9 @@ pd.set_option("display.max_columns", None)
 
 fred_data_dir = "./data/fred"
 fred_output_path = "./outputs/fred_output.csv"
-zillow_path = "./data/zillow/County_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv"
+# Add the path to your downloaded zillow file here
+# The file I select is normally ZHVI All Homes (SFR, Condo/Co-op) Time Series, Smoothed, Seasonally Adjusted ($), by County
+zillow_path = "./data/zillow/county zillow filename"
 fips_path = "./data/nrcs/nrcs_fips_codes.csv"
 final_output_path = "./outputs/fips_fred_zillow.csv"
 zfmap_path = "./data/zfmap/zillow_fred_map.csv"

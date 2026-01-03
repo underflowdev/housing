@@ -3,7 +3,9 @@ import time
 
 
 fred_base = 'https://api.stlouisfed.org/fred/release/tables'
-api_key = "put your api key here"
+# UPDATE: add your api key.  You can request one from FRED, start at https://fred.stlouisfed.org/docs/api/fred/
+# TODO: this code uses the Version 1 API, the Version 2 API might be more useful? 
+api_key = "your api key here"
 file_type = 'json'
 include_observation_values = 'true'
 

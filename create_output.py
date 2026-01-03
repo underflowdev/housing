@@ -10,13 +10,19 @@ pd.set_option("display.max_columns", None)
 
 fred_data_dir = "./data/fred"
 fred_output_path = "./outputs/fred_output.csv"
+fop_dir = os.path.dirname(fred_output_path)
+if not os.path.exists(fop_dir):
+    os.makedirs(fop_dir)
+
+# UPDATE:
 # Add the path to your downloaded zillow file here
 # The file I select is normally ZHVI All Homes (SFR, Condo/Co-op) Time Series, Smoothed, Seasonally Adjusted ($), by County
-zillow_path = "./data/zillow/county zillow filename"
+zillow_path = "./data/zillow/County_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv"
 fips_path = "./data/nrcs/nrcs_fips_codes.csv"
 final_output_path = "./outputs/fips_fred_zillow.csv"
 zfmap_path = "./data/zfmap/zillow_fred_map.csv"
 
+# fmt: off
 
 # map the state names to the state abbreviations
 state_map = {
@@ -74,8 +80,9 @@ state_map = {
 
 # map the years for the output
 year_map = {
+    # Zillow data is missing these years now.  There were a lot of blanks in there anyway.
     # "fred_1996": ["1996-01-31", "1996-02-29", "1996-03-31", "1996-04-30", "1996-05-31", "1996-06-30", "1996-07-31", "1996-08-31", "1996-09-30", "1996-10-31", "1996-11-30", "1996-12-31"],
-    # "fred_1997": ["1997-01-31", "1997-02-28", "1997-03-31", "1997-04-30", "1997-05-31", "1997-06-30", "1997-07-31", "1997-08-31", "1997-09-30", "1997-10-31", "1997-11-30", "1997-12-31"],
+    # "fred_1997": ["1997-01-31", "1997-02-28", "1997-03-31", "1997-4004-30", "1997-05-31", "1997-06-30", "1997-07-31", "1997-08-31", "1997-09-30", "1997-10-31", "1997-11-30", "1997-12-31"],
     # "fred_1998": ["1998-01-31", "1998-02-28", "1998-03-31", "1998-04-30", "1998-05-31", "1998-06-30", "1998-07-31", "1998-08-31", "1998-09-30", "1998-10-31", "1998-11-30", "1998-12-31"],
     # "fred_1999": ["1999-01-31", "1999-02-28", "1999-03-31", "1999-04-30", "1999-05-31", "1999-06-30", "1999-07-31", "1999-08-31", "1999-09-30", "1999-10-31", "1999-11-30", "1999-12-31"],
     "fred_2000": ["2000-01-31", "2000-02-29", "2000-03-31", "2000-04-30", "2000-05-31", "2000-06-30", "2000-07-31", "2000-08-31", "2000-09-30", "2000-10-31", "2000-11-30", "2000-12-31"],
@@ -102,10 +109,12 @@ year_map = {
     "fred_2021": ["2021-01-31", "2021-02-28", "2021-03-31", "2021-04-30", "2021-05-31", "2021-06-30", "2021-07-31", "2021-08-31", "2021-09-30", "2021-10-31", "2021-11-30", "2021-12-31"],
     "fred_2022": ["2022-01-31", "2022-02-28", "2022-03-31", "2022-04-30", "2022-05-31", "2022-06-30", "2022-07-31", "2022-08-31", "2022-09-30", "2022-10-31", "2022-11-30", "2022-12-31"],
     "fred_2023": ["2023-01-31", "2023-02-28", "2023-03-31", "2023-04-30", "2023-05-31", "2023-06-30", "2023-07-31", "2023-08-31", "2023-09-30", "2023-10-31", "2023-11-30", "2023-12-31"],
+    # FRED downloads exist for 2024 and 2025, but they have no salary data in them, just blank structures
     "fred_2024": ["2024-01-31", "2024-02-29", "2024-03-31", "2024-04-30", "2024-05-31", "2024-06-30", "2024-07-31", "2024-08-31", "2024-09-30", "2024-10-31", "2024-11-30", "2024-12-31"],
-    "fred_2025": ["2025-01-31"],
-    # "fred_2025": ["2025-01-31", "2025-02-29", "2025-03-31", "2025-04-30", "2025-05-31", "2025-06-30", "2025-07-31", "2025-08-31", "2025-09-30", "2025-10-31", "2025-11-30", "2025-12-31"],
+    "fred_2025": ["2025-01-31", "2025-02-28", "2025-03-31", "2025-04-30", "2025-05-31", "2025-06-30", "2025-07-31", "2025-08-31", "2025-09-30", "2025-10-31", "2025-11-30"],
 }
+
+# fmt: on
 
 header_written = False
 
@@ -118,10 +127,6 @@ zillow = pd.read_csv(zillow_path)
 # https://www.nrcs.usda.gov/wps/portal/nrcs/detail/national/home/?cid=nrcs143_013697,
 # Add " County" or " Borough" or "Parish" or remove spaces... to each name for a merge
 fips = pd.read_csv(fips_path, dtype=str)
-
-# map the zillow county names to the fred county names
-# manual.  Ugh.
-zfmap = pd.read_csv(zfmap_path, dtype=str)
 
 # https://fred.stlouisfed.org/release/tables?rid=175&eid=266090
 fred_files = os.listdir(fred_data_dir)
@@ -138,7 +143,7 @@ for fred_file in fred_files:
         for element in elements.values():
             fred_county = element.get("name")
             fred_value = element.get("observation_value")
-            if (fred_value == "."):
+            if fred_value == ".":
                 fred_value = None
             else:
                 fred_value = fred_value.replace(",", "")
@@ -157,35 +162,50 @@ fred = pd.DataFrame(result.values())
 # kick fred data out to a csv for inspection
 fred.to_csv(fred_output_path, index=False)
 
-# The fred map bridges missing and misnamed values between fred and zillow.
-fred_map = pd.merge(zfmap, fred, left_on=[
-    "map_fred_state_abbr", "map_fred_county"], right_on=["fred_state_abbr", "fred_county"])
+# map the zillow county names to the fred county names
+# manual.  Ugh.
+zfmap = pd.read_csv(zfmap_path, dtype=str)
+
+# The zillow-fred map (zfmap) bridges missing and misnamed values between fred and zillow.
+fred_map = pd.merge(
+    zfmap,
+    fred,
+    left_on=["map_fred_state_abbr", "map_fred_county"],
+    right_on=["fred_state_abbr", "fred_county"],
+)
 
 
-# 40 values in zillow but not fred
-# 304 values in fred but not zillow
+# some values in zillow but not fred
+# some values in fred but not zillow
 # Find missing values by doing how="left" or how="right" and followup merge "left_only" or "right_only"
 # https://stackoverflow.com/questions/50543326/how-to-do-left-outer-join-exclusion-in-pandas
 # zillow_fred = pd.merge(fred_map, zillow, left_on=[
 #                        "map_zillow_state_abbr", "map_zillow_county"], right_on=[ZILLOW_STATE_ABBR, ZILLOW_COUNTY], how="left", indicator=True)
 # zillow_fred = zillow_fred[zillow_fred['_merge'] == 'left_only']
 
-fred_zillow = pd.merge(fred_map, zillow, left_on=[
-    "map_zillow_state_abbr", "map_zillow_county"], right_on=[ZILLOW_STATE_ABBR, ZILLOW_COUNTY])
+fred_zillow = pd.merge(
+    fred_map,
+    zillow,
+    left_on=["map_zillow_state_abbr", "map_zillow_county"],
+    right_on=[ZILLOW_STATE_ABBR, ZILLOW_COUNTY],
+)
 
 # add fips codes
-final = pd.merge(fips, fred_zillow, left_on=[
-    "nrcs_abbr", "nrcs_county"], right_on=["fred_state_abbr", "fred_county"])
+final = pd.merge(
+    fips,
+    fred_zillow,
+    left_on=["nrcs_abbr", "nrcs_county"],
+    right_on=["fred_state_abbr", "fred_county"],
+)
 
 # losing some on the fips merge, not sure why
-zillow_path = "./data/zillow/County_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv"
-fips_path = "./data/nrcs/nrcs_fips_codes.csv"
-final_output_path = "./outputs/fips_fred_zillow.csv"
-print(final)
 
-# guessing on the inflation, since the FRED data doesn't have income past 2023
+# guessing on the income increase, since the FRED data doesn't have income past 2023
 final["fred_2024"] = final["fred_2023"] * 1.02
 final["fred_2025"] = final["fred_2024"] * 1.02
+
+# debug final dataframe
+# print(final)
 
 # Create a list to store the new ratio columns
 new_columns = []

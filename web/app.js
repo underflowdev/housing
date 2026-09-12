@@ -146,8 +146,9 @@ function renderLegendSwatch() {
 
   const svg = d3.select("#legend-swatch");
   svg.selectAll("*").remove();
-  const width = 140;
-  svg.attr("width", width);
+  // The <svg> itself stretches via CSS (width: 100%), but a shape drawn
+  // inside it needs its own width in the same terms - a hardcoded pixel
+  // width here would just leave the rest of the (now wider) box blank.
   const defs = svg.append("defs");
   const gradId = "legend-gradient";
   const grad = defs.append("linearGradient").attr("id", gradId);
@@ -159,7 +160,7 @@ function renderLegendSwatch() {
       .attr("offset", `${t * 100}%`)
       .attr("stop-color", scale(lo + t * (hi - lo)));
   }
-  svg.append("rect").attr("width", width).attr("height", 14).attr("fill", `url(#${gradId})`);
+  svg.append("rect").attr("width", "100%").attr("height", 14).attr("fill", `url(#${gradId})`);
   document.getElementById("legend-min").textContent = lo.toFixed(1) + "x";
   document.getElementById("legend-max").textContent = hi.toFixed(1) + "x";
 

@@ -166,10 +166,7 @@ function wireControls() {
   const slider = document.getElementById("timeline-slider");
   slider.addEventListener("input", () => {
     state.monthIndex = +slider.value;
-    updateTimelineLabel();
-    renderMap();
-    renderDetailMarker();
-    pushHash();
+    onTimelineChange();
   });
 
   document.getElementById("play-toggle").addEventListener("click", togglePlay);
@@ -177,6 +174,25 @@ function wireControls() {
   document.getElementById("county-search").addEventListener("input", (e) => {
     renderCountyList(e.target.value.trim().toLowerCase());
   });
+}
+
+// Shared by the slider's own input handler and the play-loop timer: keeps
+// the map, county list (its no-data graying is month-dependent), and
+// whichever right-hand panel is showing (state summary or county detail
+// marker) all in sync with the current month.
+function onTimelineChange() {
+  updateTimelineLabel();
+  renderMap();
+  if (state.view === "state") {
+    const searchTerm = document.getElementById("county-search").value.trim().toLowerCase();
+    renderCountyList(searchTerm);
+    if (state.countyFips) {
+      renderDetailMarker();
+    } else {
+      renderStateSummary();
+    }
+  }
+  pushHash();
 }
 
 function togglePlay() {
@@ -194,10 +210,7 @@ function togglePlay() {
     if (next > data.months.length - 1) next = 0;
     state.monthIndex = next;
     slider.value = next;
-    updateTimelineLabel();
-    renderMap();
-    renderDetailMarker();
-    pushHash();
+    onTimelineChange();
   }, 200);
 }
 
@@ -219,6 +232,8 @@ function render() {
 
   const listPanel = document.getElementById("county-list-panel");
   const detailPanel = document.getElementById("detail-panel");
+  const stateSummaryEl = document.getElementById("state-summary");
+  const countyDetailEl = document.getElementById("county-detail");
 
   if (state.view === "nation") {
     listPanel.hidden = true;
@@ -227,14 +242,18 @@ function render() {
     renderMap();
   } else {
     listPanel.hidden = false;
+    detailPanel.hidden = false;
     document.getElementById("crumb-title").textContent = stateName(state.stateFips);
     renderCountyList("");
     renderMap();
     if (state.countyFips) {
-      detailPanel.hidden = false;
+      stateSummaryEl.hidden = true;
+      countyDetailEl.hidden = false;
       renderDetail();
     } else {
-      detailPanel.hidden = true;
+      stateSummaryEl.hidden = false;
+      countyDetailEl.hidden = true;
+      renderStateSummary();
     }
   }
 }
@@ -395,6 +414,107 @@ function renderCountyList(filterText) {
     li.addEventListener("click", () => selectCounty(c.fips));
     ul.appendChild(li);
   });
+}
+
+// ---------- state summary (shown in the right panel when no county is selected) ----------
+
+function renderStateSummary() {
+  document.getElementById("state-summary-title").textContent = stateName(state.stateFips) + " overview";
+
+  const rows = data.counties
+    .filter((c) => c.fips.slice(0, 2) === state.stateFips)
+    .map((c) => {
+      const entry = byFips.get(c.fips);
+      const zhvi = data.zhvi[entry.index][state.monthIndex];
+      const year = data.months[state.monthIndex].slice(0, 4);
+      const byYear = data.income[c.fips];
+      const income = byYear ? byYear[year] : null;
+      const income_est = income != null ? income : null;
+      const ratio = zhvi != null && income_est != null ? zhvi / income_est : null;
+      return { fips: c.fips, name: c.name, zhvi, income: income_est, ratio };
+    });
+
+  const withZhvi = rows.filter((r) => r.zhvi != null);
+  const withIncome = rows.filter((r) => r.income != null);
+  const withRatio = rows.filter((r) => r.ratio != null);
+
+  const el = document.getElementById("state-summary-stats");
+  el.innerHTML = "";
+
+  addStatCard(el, "Coverage this month", [
+    { label: "Counties with a ratio", value: `${withRatio.length} / ${rows.length}`, county: null },
+  ]);
+
+  if (withZhvi.length) {
+    addStatCard(el, "Home value (ZHVI)", [
+      { label: "Highest", value: fmtDollar(maxBy(withZhvi, "zhvi").zhvi), county: maxBy(withZhvi, "zhvi") },
+      { label: "Lowest", value: fmtDollar(minBy(withZhvi, "zhvi").zhvi), county: minBy(withZhvi, "zhvi") },
+    ]);
+  }
+
+  if (withIncome.length) {
+    addStatCard(el, "Per-capita income", [
+      { label: "Highest", value: fmtDollar(maxBy(withIncome, "income").income), county: maxBy(withIncome, "income") },
+      { label: "Lowest", value: fmtDollar(minBy(withIncome, "income").income), county: minBy(withIncome, "income") },
+    ]);
+  }
+
+  if (withRatio.length) {
+    const avgRatio = withRatio.reduce((sum, r) => sum + r.ratio, 0) / withRatio.length;
+    addStatCard(el, "Price / income ratio", [
+      { label: "Highest", value: maxBy(withRatio, "ratio").ratio.toFixed(2) + "x", county: maxBy(withRatio, "ratio") },
+      { label: "Lowest", value: minBy(withRatio, "ratio").ratio.toFixed(2) + "x", county: minBy(withRatio, "ratio") },
+      { label: "State average", value: avgRatio.toFixed(2) + "x", county: null },
+    ]);
+  }
+}
+
+function maxBy(arr, key) {
+  return arr.reduce((a, b) => (b[key] > a[key] ? b : a));
+}
+
+function minBy(arr, key) {
+  return arr.reduce((a, b) => (b[key] < a[key] ? b : a));
+}
+
+function fmtDollar(v) {
+  return "$" + d3.format(",.0f")(v);
+}
+
+function addStatCard(container, title, items) {
+  const card = document.createElement("div");
+  card.className = "stat-card";
+  const heading = document.createElement("div");
+  heading.className = "stat-card-title";
+  heading.textContent = title;
+  card.appendChild(heading);
+
+  items.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "stat-row";
+
+    const label = document.createElement("span");
+    label.className = "stat-label";
+    label.textContent = item.label;
+    row.appendChild(label);
+
+    const countyName = document.createElement("span");
+    countyName.className = "stat-county";
+    countyName.textContent = item.county ? item.county.name : "";
+    row.appendChild(countyName);
+
+    const value = document.createElement("span");
+    value.className = "stat-value";
+    value.textContent = item.value;
+    row.appendChild(value);
+
+    if (item.county) {
+      row.addEventListener("click", () => selectCounty(item.county.fips));
+    }
+    card.appendChild(row);
+  });
+
+  container.appendChild(card);
 }
 
 // ---------- detail inset (dual-line chart: zhvi + income, real values) ----------

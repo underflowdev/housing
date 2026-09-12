@@ -225,6 +225,57 @@ body {
   display: inline-block;
 }
 
+.hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0 0 0.75rem;
+}
+
+#state-summary-stats {
+  margin: 0;
+}
+
+.stat-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.65rem;
+  margin-bottom: 0.6rem;
+}
+
+.stat-card-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 0 0 0.35rem;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.85rem;
+  padding: 0.15rem 0;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.stat-row:hover { background: var(--bg); }
+
+.stat-row .stat-label {
+  color: var(--text-muted);
+  margin-right: 0.5rem;
+}
+
+.stat-row .stat-county {
+  flex: 1;
+}
+
+.stat-row .stat-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
 #timeline-panel {
   display: flex;
   align-items: center;

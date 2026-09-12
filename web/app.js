@@ -558,16 +558,20 @@ function renderSummaryStatCards(el, rows, avgLabel) {
   ]);
 
   if (withZhvi.length) {
+    const avgZhvi = withZhvi.reduce((sum, r) => sum + r.zhvi, 0) / withZhvi.length;
     addStatCard(el, "Home value (ZHVI)", [
       { label: "Highest", value: fmtDollar(maxBy(withZhvi, "zhvi").zhvi), county: maxBy(withZhvi, "zhvi") },
       { label: "Lowest", value: fmtDollar(minBy(withZhvi, "zhvi").zhvi), county: minBy(withZhvi, "zhvi") },
+      { label: avgLabel, value: fmtDollar(avgZhvi), county: null },
     ]);
   }
 
   if (withIncome.length) {
+    const avgIncome = withIncome.reduce((sum, r) => sum + r.income, 0) / withIncome.length;
     addStatCard(el, "Per-capita income", [
       { label: "Highest", value: fmtDollar(maxBy(withIncome, "income").income), county: maxBy(withIncome, "income") },
       { label: "Lowest", value: fmtDollar(minBy(withIncome, "income").income), county: minBy(withIncome, "income") },
+      { label: avgLabel, value: fmtDollar(avgIncome), county: null },
     ]);
   }
 

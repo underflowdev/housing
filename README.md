@@ -45,7 +45,23 @@ on just those years later to check whether they've since been published:
 python fred_fetch.py --start-year 2024 --end-year 2025 --force
 ```
 
-## 3. Download the Zillow data (manual step)
+## 3. Fetch QCEW wage data (optional, but recommended)
+
+```
+python qcew_fetch.py
+```
+
+FRED's own income data typically lags 1-2 years behind the present. This
+pulls BLS QCEW's quarterly average-weekly-wage data (2014 Q1 onward — earlier
+quarters aren't available via this API) into `data/qcew/qcew_<year>_q<qtr>.csv`,
+one request per year/quarter covering every county nationwide. `build_income.py`
+uses the year-over-year change in this data as a growth rate to extrapolate
+each county's last known FRED figure into the years FRED hasn't published yet.
+Use `--limit N` for a quick test, `--start-year`/`--end-year` to narrow the
+range. If you skip this step, `build_income.py` still runs fine — those recent
+years are simply left blank instead of estimated.
+
+## 4. Download the Zillow data (manual step)
 
 Zillow's data isn't available through an API, so this step is manual:
 
@@ -58,7 +74,7 @@ Zillow's data isn't available through an API, so this step is manual:
 4. Open `create_output.py` and update the `zillow_path` variable (near the
    top, marked `# UPDATE:`) to point at the file you just downloaded.
 
-## 4. Build the output
+## 5. Build the output
 
 ```
 python build_income.py && python create_output.py

@@ -226,6 +226,39 @@ body {
   margin-bottom: 0;
 }
 
+.sources-legend {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  left: auto;
+  max-width: 260px;
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.sources-legend ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sources-legend li {
+  margin-bottom: 0.3rem;
+}
+
+.sources-legend li:last-child {
+  margin-bottom: 0;
+}
+
+.sources-legend a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.sources-legend a:hover {
+  text-decoration: underline;
+}
+
 .legend-title {
   font-weight: 600;
   margin-bottom: 0.3rem;

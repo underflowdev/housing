@@ -41,6 +41,7 @@ A single-page vanilla JS + D3 app (no build step, no framework) — national cho
 - **Default month on load** is the latest month with *any* income coverage, not Zillow's own latest month — FRED's annual income lags Zillow's monthly data by a year or more, so defaulting to Zillow's latest month would show an all-gray "no data" map on first load. See `latestMonthWithIncomeData()`.
 - Counties/list entries with no income data for the selected month render gray / grayed-out text (per-month, not just per-county — a county can have data for some months and not others depending on FRED's coverage).
 - Deploying: `web/` is the entire deployable unit — sync its contents (after running `web_data_build.py`) to the S3 bucket root.
+- **Attribution:** the map has a "Data sources" box (bottom-right of `#map-panel`) linking to Zillow, FRED/BEA, BLS QCEW, and us-atlas/Census TIGER — required/expected attribution for each (Zillow's terms ask for "Data Provided by Zillow Group" cited on every page displaying their data; FRED asks both the source agency and FRED be cited). Update this if a data source changes.
 
 ## QCEW: growth-rate source now, parked as a level/income source
 

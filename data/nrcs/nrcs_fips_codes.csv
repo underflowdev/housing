@@ -56,7 +56,7 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 01109,Pike,AL,Pike County
 01111,Randolph,AL,Randolph County
 01113,Russell,AL,Russell County
-01115,St Clair,AL,St Clair County
+01115,St Clair,AL,St. Clair County
 01117,Shelby,AL,Shelby County
 01119,Sumter,AL,Sumter County
 01121,Talladega,AL,Talladega County
@@ -66,33 +66,34 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 01129,Washington,AL,Washington County
 01131,Wilcox,AL,Wilcox County
 01133,Winston,AL,Winston County
-02013,Aleutians East,AK,Aleutians East County
-02016,Aleutians West,AK,Aleutians West County
-02020,Anchorage,AK,Anchorage County
-02050,Bethel,AK,Bethel County
-02060,Bristol Bay,AK,Bristol Bay County
-02068,Denali,AK,Denali County
-02070,Dillingham,AK,Dillingham County
+02013,Aleutians East,AK,Aleutians East Borough
+02016,Aleutians West,AK,Aleutians West Census Area
+02020,Anchorage,AK,Anchorage Borough/municipality
+02050,Bethel,AK,Bethel Census Area
+02060,Bristol Bay,AK,Bristol Bay Borough
+02068,Denali,AK,Denali Borough
+02070,Dillingham,AK,Dillingham Census Area
 02090,Fairbanks North Star,AK,Fairbanks North Star Borough
-02100,Haines,AK,Haines County
-02110,Juneau,AK,Juneau County
+02100,Haines,AK,Haines Borough
+02105,Hoonah-Angoon,AK,Hoonah-Angoon Census Area
+02110,Juneau,AK,Juneau Borough/city
 02122,Kenai Peninsula,AK,Kenai Peninsula Borough
 02130,Ketchikan Gateway,AK,Ketchikan Gateway Borough
 02150,Kodiak Island,AK,Kodiak Island Borough
-02164,Lake and Peninsula,AK,Lake and Peninsula County
-02170,Matanuska-Susitna,AK,Matanuska-Susitna County
-02180,Nome,AK,Nome County
-02185,North Slope,AK,North Slope County
-02188,Northwest Arctic,AK,Northwest Arctic County
-02201,Prince of Wales-Outer Ketchikan,AK,Prince of Wales-Outer Ketchikan County
-02220,Sitka,AK,Sitka County
-02232,Skagway-Hoonah-Angoon,AK,Skagway-Hoonah-Angoon County
-02240,Southeast Fairbanks,AK,Southeast Fairbanks County
-02261,Valdez-Cordova,AK,Valdez-Cordova County
-02270,Wade Hampton,AK,Wade Hampton County
-02280,Wrangell-Petersburg,AK,Wrangell-Petersburg County
-02282,Yakutat,AK,Yakutat County
-02290,Yukon-Koyukuk,AK,Yukon-Koyukuk County
+02164,Lake and Peninsula,AK,Lake and Peninsula Borough
+02170,Matanuska-Susitna,AK,Matanuska-Susitna Borough
+02180,Nome,AK,Nome Census Area
+02185,North Slope,AK,North Slope Borough
+02188,Northwest Arctic,AK,Northwest Arctic Borough
+02195,Petersburg,AK,Petersburg Census Area
+02198,Prince of Wales-Hyder,AK,Prince of Wales-Hyder Census Area
+02220,Sitka,AK,Sitka Borough/city
+02230,Skagway,AK,Skagway Municipality
+02240,Southeast Fairbanks,AK,Southeast Fairbanks Census Area
+02270,Wade Hampton,AK,Wade Hampton Census Area
+02275,Wrangell,AK,Wrangell Borough/City
+02282,Yakutat,AK,Yakutat City and Borough
+02290,Yukon-Koyukuk,AK,Yukon-Koyukuk Census Area
 04001,Apache,AZ,Apache County
 04003,Cochise,AZ,Cochise County
 04005,Coconino,AZ,Coconino County
@@ -169,7 +170,7 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 05117,Prairie,AR,Prairie County
 05119,Pulaski,AR,Pulaski County
 05121,Randolph,AR,Randolph County
-05123,St Francis,AR,St Francis County
+05123,St Francis,AR,St. Francis County
 05125,Saline,AR,Saline County
 05127,Scott,AR,Scott County
 05129,Searcy,AR,Searcy County
@@ -220,7 +221,7 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 06069,San Benito,CA,San Benito County
 06071,San Bernardino,CA,San Bernardino County
 06073,San Diego,CA,San Diego County
-06075,San Francisco,CA,San Francisco County
+06075,San Francisco,CA,San Francisco County/city
 06077,San Joaquin,CA,San Joaquin County
 06079,San Luis Obispo,CA,San Luis Obispo County
 06081,San Mateo,CA,San Mateo County
@@ -315,7 +316,7 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 10001,Kent,DE,Kent County
 10003,New Castle,DE,New Castle County
 10005,Sussex,DE,Sussex County
-11001,Washington,DC,Washington County
+11001,Washington,DC,District of Columbia
 12001,Alachua,FL,Alachua County
 12003,Baker,FL,Baker County
 12005,Bay,FL,Bay County
@@ -370,8 +371,8 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 12103,Pinellas,FL,Pinellas County
 12105,Polk,FL,Polk County
 12107,Putnam,FL,Putnam County
-12109,St Johns,FL,St Johns County
-12111,St Lucie,FL,St Lucie County
+12109,St Johns,FL,St. Johns County
+12111,St Lucie,FL,St. Lucie County
 12113,Santa Rosa,FL,Santa Rosa County
 12115,Sarasota,FL,Sarasota County
 12117,Seminole,FL,Seminole County
@@ -543,7 +544,7 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 13319,Wilkinson,GA,Wilkinson County
 13321,Worth,GA,Worth County
 15001,Hawaii,HI,Hawaii County
-15003,Honolulu,HI,Honolulu County
+15003,Honolulu,HI,Honolulu County/city
 15007,Kauai,HI,Kauai County
 15009,Maui,HI,Maui County
 16001,Ada,ID,Ada County
@@ -639,7 +640,7 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 17093,Kendall,IL,Kendall County
 17095,Knox,IL,Knox County
 17097,Lake,IL,Lake County
-17099,La Salle,IL,La Salle County
+17099,La Salle,IL,LaSalle County
 17101,Lawrence,IL,Lawrence County
 17103,Lee,IL,Lee County
 17105,Livingston,IL,Livingston County
@@ -671,7 +672,7 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 17157,Randolph,IL,Randolph County
 17159,Richland,IL,Richland County
 17161,Rock Island,IL,Rock Island County
-17163,St Clair,IL,St Clair County
+17163,St Clair,IL,St. Clair County
 17165,Saline,IL,Saline County
 17167,Sangamon,IL,Sangamon County
 17169,Schuyler,IL,Schuyler County
@@ -735,9 +736,9 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 18081,Johnson,IN,Johnson County
 18083,Knox,IN,Knox County
 18085,Kosciusko,IN,Kosciusko County
-18087,La Grange,IN,La Grange County
+18087,La Grange,IN,LaGrange County
 18089,Lake,IN,Lake County
-18091,La Porte,IN,La Porte County
+18091,La Porte,IN,LaPorte County
 18093,Lawrence,IN,Lawrence County
 18095,Madison,IN,Madison County
 18097,Marion,IN,Marion County
@@ -762,7 +763,7 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 18135,Randolph,IN,Randolph County
 18137,Ripley,IN,Ripley County
 18139,Rush,IN,Rush County
-18141,St Joseph,IN,St Joseph County
+18141,St Joseph,IN,St. Joseph County
 18143,Scott,IN,Scott County
 18145,Shelby,IN,Shelby County
 18147,Spencer,IN,Spencer County
@@ -854,7 +855,7 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 19135,Monroe,IA,Monroe County
 19137,Montgomery,IA,Montgomery County
 19139,Muscatine,IA,Muscatine County
-19141,O Brien,IA,O Brien County
+19141,O Brien,IA,O'Brien County
 19143,Osceola,IA,Osceola County
 19145,Page,IA,Page County
 19147,Palo Alto,IA,Palo Alto County
@@ -1120,12 +1121,12 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 22019,Calcasieu,LA,Calcasieu Parish
 22021,Caldwell,LA,Caldwell Parish
 22023,Cameron,LA,Cameron Parish
-22025,Catahoula,LA,Catahoula County
+22025,Catahoula,LA,Catahoula Parish
 22027,Claiborne,LA,Claiborne Parish
 22029,Concordia,LA,Concordia Parish
 22031,De Soto,LA,De Soto Parish
 22033,East Baton Rouge,LA,East Baton Rouge Parish
-22035,East Carroll,LA,East Carroll County
+22035,East Carroll,LA,East Carroll Parish
 22037,East Feliciana,LA,East Feliciana Parish
 22039,Evangeline,LA,Evangeline Parish
 22041,Franklin,LA,Franklin Parish
@@ -1137,10 +1138,10 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 22053,Jefferson Davis,LA,Jefferson Davis Parish
 22055,Lafayette,LA,Lafayette Parish
 22057,Lafourche,LA,Lafourche Parish
-22059,La Salle,LA,La Salle County
+22059,La Salle,LA,La Salle Parish
 22061,Lincoln,LA,Lincoln Parish
 22063,Livingston,LA,Livingston Parish
-22065,Madison,LA,Madison County
+22065,Madison,LA,Madison Parish
 22067,Morehouse,LA,Morehouse Parish
 22069,Natchitoches,LA,Natchitoches Parish
 22071,Orleans,LA,Orleans Parish
@@ -1151,15 +1152,15 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 22081,Red River,LA,Red River Parish
 22083,Richland,LA,Richland Parish
 22085,Sabine,LA,Sabine Parish
-22087,St Bernard,LA,St Bernard County
-22089,St Charles,LA,St Charles County
-22091,St Helena,LA,St Helena County
-22093,St James,LA,St James County
-22095,St John the Baptist,LA,St John the Baptist County
-22097,St Landry,LA,St Landry County
-22099,St Martin,LA,St Martin County
-22101,St Mary,LA,St Mary County
-22103,St Tammany,LA,St Tammany County
+22087,St Bernard,LA,St. Bernard Parish
+22089,St Charles,LA,St. Charles Parish
+22091,St Helena,LA,St. Helena Parish
+22093,St James,LA,St. James Parish
+22095,St John the Baptist,LA,St. John the Baptist Parish
+22097,St Landry,LA,St. Landry Parish
+22099,St Martin,LA,St. Martin Parish
+22101,St Mary,LA,St. Mary Parish
+22103,St Tammany,LA,St. Tammany Parish
 22105,Tangipahoa,LA,Tangipahoa Parish
 22107,Tensas,LA,Tensas Parish
 22109,Terrebonne,LA,Terrebonne Parish
@@ -1203,15 +1204,15 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 24027,Howard,MD,Howard County
 24029,Kent,MD,Kent County
 24031,Montgomery,MD,Montgomery County
-24033,Prince Georges,MD,Prince Georges County
-24035,Queen Annes,MD,Queen Annes County
-24037,St Marys,MD,St Marys County
+24033,Prince Georges,MD,Prince George's County
+24035,Queen Annes,MD,Queen Anne's County
+24037,St Marys,MD,St. Mary's County
 24039,Somerset,MD,Somerset County
 24041,Talbot,MD,Talbot County
 24043,Washington,MD,Washington County
 24045,Wicomico,MD,Wicomico County
 24047,Worcester,MD,Worcester County
-24510,Baltimore City,MD,Baltimore City County
+24510,Baltimore City,MD,Baltimore city
 25001,Barnstable,MA,Barnstable County
 25003,Berkshire,MA,Berkshire County
 25005,Bristol,MA,Bristol County
@@ -1299,8 +1300,8 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 26141,Presque Isle,MI,Presque Isle County
 26143,Roscommon,MI,Roscommon County
 26145,Saginaw,MI,Saginaw County
-26147,St Clair,MI,St Clair County
-26149,St Joseph,MI,St Joseph County
+26147,St Clair,MI,St. Clair County
+26149,St Joseph,MI,St. Joseph County
 26151,Sanilac,MI,Sanilac County
 26153,Schoolcraft,MI,Schoolcraft County
 26155,Shiawassee,MI,Shiawassee County
@@ -1377,7 +1378,7 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 27131,Rice,MN,Rice County
 27133,Rock,MN,Rock County
 27135,Roseau,MN,Roseau County
-27137,St Louis,MN,St Louis County
+27137,St Louis,MN,St. Louis County
 27139,Scott,MN,Scott County
 27141,Sherburne,MN,Sherburne County
 27143,Sibley,MN,Sibley County
@@ -1569,11 +1570,11 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 29177,Ray,MO,Ray County
 29179,Reynolds,MO,Reynolds County
 29181,Ripley,MO,Ripley County
-29183,St Charles,MO,St Charles County
-29185,St Clair,MO,St Clair County
+29183,St Charles,MO,St. Charles County
+29185,St Clair,MO,St. Clair County
 29186,Ste. Genevieve,MO,Ste. Genevieve County
-29187,St Francois,MO,St Francois County
-29189,St Louis,MO,St Louis County
+29187,St Francois,MO,St. Francois County
+29189,St Louis,MO,St. Louis County
 29195,Saline,MO,Saline County
 29197,Schuyler,MO,Schuyler County
 29199,Scotland,MO,Scotland County
@@ -1592,7 +1593,7 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 29225,Webster,MO,Webster County
 29227,Worth,MO,Worth County
 29229,Wright,MO,Wright County
-29510,St Louis City,MO,St Louis City County
+29510,St Louis City,MO,St. Louis city
 30001,Beaverhead,MT,Beaverhead County
 30003,Big Horn,MT,Big Horn County
 30005,Blaine,MT,Blaine County
@@ -1868,7 +1869,7 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 36083,Rensselaer,NY,Rensselaer County
 36085,Richmond,NY,Richmond County
 36087,Rockland,NY,Rockland County
-36089,St Lawrence,NY,St Lawrence County
+36089,St Lawrence,NY,St. Lawrence County
 36091,Saratoga,NY,Saratoga County
 36093,Schenectady,NY,Schenectady County
 36095,Schoharie,NY,Schoharie County
@@ -2008,7 +2009,7 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 38039,Griggs,ND,Griggs County
 38041,Hettinger,ND,Hettinger County
 38043,Kidder,ND,Kidder County
-38045,La Moure,ND,La Moure County
+38045,La Moure,ND,LaMoure County
 38047,Logan,ND,Logan County
 38049,McHenry,ND,McHenry County
 38051,McIntosh,ND,McIntosh County
@@ -2290,7 +2291,7 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 42095,Northampton,PA,Northampton County
 42097,Northumberland,PA,Northumberland County
 42099,Perry,PA,Perry County
-42101,Philadelphia,PA,Philadelphia County
+42101,Philadelphia,PA,Philadelphia County/city
 42103,Pike,PA,Pike County
 42105,Potter,PA,Potter County
 42107,Schuylkill,PA,Schuylkill County
@@ -2580,7 +2581,7 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 48117,Deaf Smith,TX,Deaf Smith County
 48119,Delta,TX,Delta County
 48121,Denton,TX,Denton County
-48123,De Witt,TX,De Witt County
+48123,De Witt,TX,DeWitt County
 48125,Dickens,TX,Dickens County
 48127,Dimmit,TX,Dimmit County
 48129,Donley,TX,Donley County
@@ -2817,8 +2818,8 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 50025,Windham,VT,Windham County
 50027,Windsor,VT,Windsor County
 51001,Accomack,VA,Accomack County
-51003,Albemarle,VA,Albemarle County
-51005,Alleghany,VA,Alleghany County
+51003,Albemarle,VA,Albemarle County + Charlottesville City
+51005,Alleghany,VA,Alleghany County + Covington City
 51007,Amelia,VA,Amelia County
 51009,Amherst,VA,Amherst County
 51011,Appomattox,VA,Appomattox County
@@ -2831,9 +2832,9 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 51025,Brunswick,VA,Brunswick County
 51027,Buchanan,VA,Buchanan County
 51029,Buckingham,VA,Buckingham County
-51031,Campbell,VA,Campbell County
+51031,Campbell,VA,Campbell County + Lynchburg City
 51033,Caroline,VA,Caroline County
-51035,Carroll,VA,Carroll County
+51035,Carroll,VA,Carroll County + Galax City
 51036,Charles City,VA,Charles City County
 51037,Charlotte,VA,Charlotte County
 51041,Chesterfield,VA,Chesterfield County
@@ -2849,20 +2850,20 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 51063,Floyd,VA,Floyd County
 51065,Fluvanna,VA,Fluvanna County
 51067,Franklin,VA,Franklin County
-51069,Frederick,VA,Frederick County
+51069,Frederick,VA,Frederick County + Winchester City
 51071,Giles,VA,Giles County
 51073,Gloucester,VA,Gloucester County
 51075,Goochland,VA,Goochland County
 51077,Grayson,VA,Grayson County
 51079,Greene,VA,Greene County
-51081,Greensville,VA,Greensville County
+51081,Greensville,VA,Greensville County + Emporia City
 51083,Halifax,VA,Halifax County
 51085,Hanover,VA,Hanover County
 51087,Henrico,VA,Henrico County
-51089,Henry,VA,Henry County
+51089,Henry,VA,Henry County + Martinsville City
 51091,Highland,VA,Highland County
 51093,Isle of Wight,VA,Isle of Wight County
-51095,James City,VA,James City County
+51095,James City,VA,James City County + Williamsburg City
 51097,King and Queen,VA,King and Queen County
 51099,King George,VA,King George County
 51101,King William,VA,King William County
@@ -2875,7 +2876,7 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 51115,Mathews,VA,Mathews County
 51117,Mecklenburg,VA,Mecklenburg County
 51119,Middlesex,VA,Middlesex County
-51121,Montgomery,VA,Montgomery County
+51121,Montgomery,VA,Montgomery County + Radford City
 51125,Nelson,VA,Nelson County
 51127,New Kent,VA,New Kent County
 51131,Northampton,VA,Northampton County
@@ -2884,33 +2885,33 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 51137,Orange,VA,Orange County
 51139,Page,VA,Page County
 51141,Patrick,VA,Patrick County
-51143,Pittsylvania,VA,Pittsylvania County
+51143,Pittsylvania,VA,Pittsylvania County + Danville City
 51145,Powhatan,VA,Powhatan County
 51147,Prince Edward,VA,Prince Edward County
-51149,Prince George,VA,Prince George County
+51149,Prince George,VA,Prince George County + Hopewell City
 51153,Prince William,VA,Prince William County
 51155,Pulaski,VA,Pulaski County
 51157,Rappahannock,VA,Rappahannock County
 51159,Richmond,VA,Richmond County
-51161,Roanoke,VA,Roanoke County
+51161,Roanoke,VA,Roanoke County + Salem City
 51163,Rockbridge,VA,Rockbridge County
-51165,Rockingham,VA,Rockingham County
+51165,Rockingham,VA,Rockingham County + Harrisonburg City
 51167,Russell,VA,Russell County
 51169,Scott,VA,Scott County
 51171,Shenandoah,VA,Shenandoah County
 51173,Smyth,VA,Smyth County
-51175,Southampton,VA,Southampton County
-51177,Spotsylvania,VA,Spotsylvania County
+51175,Southampton,VA,Southampton County + Franklin City
+51177,Spotsylvania,VA,Spotsylvania County + Fredericksburg City
 51179,Stafford,VA,Stafford County
 51181,Surry,VA,Surry County
 51183,Sussex,VA,Sussex County
 51185,Tazewell,VA,Tazewell County
 51187,Warren,VA,Warren County
-51191,Washington,VA,Washington County
+51191,Washington,VA,Washington County + Bristol City
 51193,Westmoreland,VA,Westmoreland County
-51195,Wise,VA,Wise County
+51195,Wise,VA,Wise County + Norton City
 51197,Wythe,VA,Wythe County
-51199,York,VA,York County
+51199,York,VA,York County + Poquoson City
 51510,Alexandria City,VA,Alexandria City County
 51515,Bedford City,VA,Bedford City County
 51520,Bristol City,VA,Bristol City County
@@ -3101,7 +3102,7 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 55103,Richland,WI,Richland County
 55105,Rock,WI,Rock County
 55107,Rusk,WI,Rusk County
-55109,St Croix,WI,St Croix County
+55109,St Croix,WI,St. Croix County
 55111,Sauk,WI,Sauk County
 55113,Sawyer,WI,Sawyer County
 55115,Shawano,WI,Shawano County
@@ -3231,3 +3232,33 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 78010,St. Croix,VI,St. Croix County
 78020,St. John,VI,St. John County
 78030,St. Thomas,VI,St. Thomas County
+08014,Broomfield,CO,Broomfield County/city
+15009,Maui + Kalawao,HI,Maui + Kalawao Counties
+51540,Charlottesville,VA,Albemarle County + Charlottesville City
+51580,Covington,VA,Alleghany County + Covington City
+51680,Lynchburg,VA,Campbell County + Lynchburg City
+51640,Galax,VA,Carroll County + Galax City
+51840,Winchester,VA,Frederick County + Winchester City
+51595,Emporia,VA,Greensville County + Emporia City
+51690,Martinsville,VA,Henry County + Martinsville City
+51830,Williamsburg,VA,James City County + Williamsburg City
+51750,Radford,VA,Montgomery County + Radford City
+51590,Danville,VA,Pittsylvania County + Danville City
+51670,Hopewell,VA,Prince George County + Hopewell City
+51775,Salem,VA,Roanoke County + Salem City
+51660,Harrisonburg,VA,Rockingham County + Harrisonburg City
+51620,Franklin,VA,Southampton County + Franklin City
+51630,Fredericksburg,VA,Spotsylvania County + Fredericksburg City
+51520,Bristol,VA,Washington County + Bristol City
+51720,Norton,VA,Wise County + Norton City
+51735,Poquoson,VA,York County + Poquoson City
+51510,Alexandria,VA,Alexandria city
+51550,Chesapeake,VA,Chesapeake city
+51650,Hampton,VA,Hampton city
+51700,Newport News,VA,Newport News city
+51710,Norfolk,VA,Norfolk city
+51740,Portsmouth,VA,Portsmouth city
+51760,Richmond,VA,Richmond city
+51770,Roanoke,VA,Roanoke city
+51800,Suffolk,VA,Suffolk city
+51810,Virginia Beach,VA,Virginia Beach city

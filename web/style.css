@@ -1,0 +1,484 @@
+:root {
+  color-scheme: light;
+  --bg: #f7f7f5;
+  --panel-bg: #ffffff;
+  --border: #d8d8d4;
+  --text: #1f1f1f;
+  --text-muted: #6b6b68;
+  --accent: #2b6cb0;
+  --no-data: #c9c9c5;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+#app-header {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-bg);
+}
+
+#app-header h1 {
+  font-size: 1.1rem;
+  margin: 0;
+  white-space: nowrap;
+}
+
+#nation-hint {
+  margin: 0;
+  white-space: nowrap;
+}
+
+#breadcrumb {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+#breadcrumb a {
+  color: var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+#breadcrumb a:hover { text-decoration: underline; }
+
+#app-main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+#county-list-panel {
+  width: 240px;
+  flex: 0 0 auto;
+  border-right: 1px solid var(--border);
+  background: var(--panel-bg);
+  padding: 0.75rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+#county-list-panel h2 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 0 0 0.5rem;
+}
+
+#county-search {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+#county-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+}
+
+#county-list li {
+  padding: 0.3rem 0.4rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+#county-list li:hover { background: var(--bg); }
+#county-list li.selected { background: var(--accent); color: white; }
+#county-list li.no-data { color: var(--text-muted); }
+
+#map-panel {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}
+
+#map-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.county-shape {
+  stroke: #ffffff;
+  stroke-width: 0.4px;
+  cursor: pointer;
+}
+
+.county-shape.no-data {
+  fill: var(--no-data);
+  cursor: default;
+}
+
+.county-shape:hover { stroke: #1f1f1f; stroke-width: 1px; }
+
+.county-shape.selected {
+  stroke: #1f1f1f;
+  stroke-width: 2.5px;
+  vector-effect: non-scaling-stroke;
+}
+
+.state-border {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 1px;
+  pointer-events: none;
+}
+
+.state-shape {
+  fill: #dfe6ee;
+  stroke: #ffffff;
+  stroke-width: 0.6px;
+  cursor: pointer;
+}
+
+.state-shape:hover { fill: #c9d8e8; }
+
+#detail-panel {
+  width: 380px;
+  flex: 0 0 auto;
+  border-left: 1px solid var(--border);
+  background: var(--panel-bg);
+  padding: 0.75rem;
+  overflow-y: auto;
+}
+
+#detail-panel h2 {
+  font-size: 1rem;
+  margin: 0 0 0.5rem;
+}
+
+#detail-svg {
+  width: 100%;
+  height: 260px;
+  display: block;
+}
+
+.legend {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.75rem;
+  min-width: 160px;
+}
+
+.collapsible {
+  position: relative;
+  padding-right: 1.75rem;
+}
+
+.legend-collapse-toggle {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  line-height: 1;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--panel-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.legend-collapse-toggle:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.collapsible.collapsed {
+  min-width: 0;
+  width: auto;
+  padding: 0.4rem 1.6rem 0.4rem 0.6rem;
+}
+
+.collapsible.collapsed > *:not(.legend-collapse-toggle):not(.legend-title) {
+  /* !important: #legend-swatch (an ID selector) sets its own display:block
+     and would otherwise win over this class-based rule regardless of
+     specificity math - same class of bug as the SVG stroke/fill issue
+     elsewhere in this file. */
+  display: none !important;
+}
+
+.collapsible.collapsed .legend-title {
+  margin: 0;
+  white-space: nowrap;
+}
+
+#map-overlay {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+#map-overlay .legend {
+  position: static;
+}
+
+/* Higher specificity than #map-overlay .legend above, needed so the
+   collapse-toggle button (position: absolute) anchors to this box itself
+   rather than escaping up to the next positioned ancestor (#map-panel) -
+   which two collapsible boxes in the same overlay would otherwise share,
+   landing their toggle buttons on top of each other. */
+#map-overlay .legend.collapsible {
+  position: relative;
+}
+
+.stats-legend {
+  min-width: 300px;
+  max-width: 340px;
+}
+
+.stats-legend .stat-row {
+  flex-wrap: wrap;
+  row-gap: 0.1rem;
+}
+
+.stats-legend .stat-county {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-legend .stat-value {
+  margin-left: 0.5rem;
+}
+
+.stats-legend .stat-card {
+  margin-bottom: 0.4rem;
+}
+
+.stats-legend .stat-card:last-child {
+  margin-bottom: 0;
+}
+
+.sources-legend {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  left: auto;
+  max-width: 260px;
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.sources-legend ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sources-legend li {
+  margin-bottom: 0.3rem;
+}
+
+.sources-legend li:last-child {
+  margin-bottom: 0;
+}
+
+.sources-legend a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.sources-legend a:hover {
+  text-decoration: underline;
+}
+
+.legend-title {
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+#legend-swatch {
+  width: 100%;
+  display: block;
+}
+
+.legend-labels {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
+.legend-note {
+  margin-top: 0.35rem;
+  color: var(--text-muted);
+}
+
+#map-legend.clickable {
+  cursor: pointer;
+}
+
+#map-legend.clickable:hover {
+  border-color: var(--accent);
+}
+
+#legend-toggle-hint {
+  font-style: italic;
+}
+
+.chart-legend {
+  position: static;
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.chart-legend .swatch-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.chart-legend .swatch {
+  width: 14px;
+  height: 3px;
+  display: inline-block;
+}
+
+#detail-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1rem 0;
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0 0 0.75rem;
+}
+
+#state-summary-stats {
+  margin: 0;
+}
+
+.stat-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.65rem;
+  margin-bottom: 0.6rem;
+}
+
+.stat-card-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 0 0 0.35rem;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.85rem;
+  padding: 0.15rem 0;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.stat-row:hover { background: var(--bg); }
+
+.stat-row .stat-label {
+  color: var(--text-muted);
+  margin-right: 0.5rem;
+}
+
+.stat-row .stat-county {
+  flex: 1;
+}
+
+.stat-row .stat-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+#timeline-panel {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1.25rem;
+  border-top: 1px solid var(--border);
+  background: var(--panel-bg);
+}
+
+#play-toggle {
+  border: 1px solid var(--border);
+  background: var(--panel-bg);
+  border-radius: 4px;
+  width: 2rem;
+  height: 2rem;
+  cursor: pointer;
+}
+
+#timeline-label {
+  font-variant-numeric: tabular-nums;
+  min-width: 5.5rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+#timeline-track {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+#timeline-slider {
+  width: 100%;
+}
+
+#timeline-scale {
+  width: 100%;
+  height: 14px;
+  display: block;
+  margin-top: -0.15rem;
+  overflow: visible;
+}
+
+#timeline-scale text {
+  font-size: 9px;
+  fill: var(--text-muted);
+}
+
+#timeline-scale line {
+  stroke: var(--border);
+}
+
+[hidden] { display: none !important; }

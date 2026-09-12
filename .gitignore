@@ -5,3 +5,4 @@ fred_key.txt
 data/qcew/qcew_*.csv
 data/fred/*.json
 web/data/*.json
+scripts/deploy.env

@@ -18,6 +18,7 @@ let byFips = new Map(); // fips -> { county, index, geo }
 let statesByFips = new Map(); // 2-digit fips -> { abbr, geo }
 let colorScale = null;
 let playTimer = null;
+let countyPathSel = null; // d3 selection of the currently-drawn county <path> elements
 
 // ---------- boot ----------
 
@@ -183,7 +184,7 @@ function wireControls() {
 // with the current month.
 function onTimelineChange() {
   updateTimelineLabel();
-  renderMap();
+  updateMapColors();
   if (state.view === "nation") {
     renderNationalSummary();
   } else {
@@ -211,7 +212,7 @@ function togglePlay() {
     state.monthIndex = next;
     slider.value = next;
     onTimelineChange();
-  }, 200);
+  }, 100);
 }
 
 function updateTimelineLabel() {
@@ -302,6 +303,13 @@ function renderBreadcrumb() {
 
 // ---------- map ----------
 
+// Rebuilds the map geometry from scratch: projection, path generation for
+// every county polygon, click handlers, state border. This is the
+// expensive part (measured ~270-300ms at national scope for 3,231
+// counties) - only call it when the view actually changes (nation <-> a
+// state, or which state), never on every timeline tick. Recoloring for a
+// month change is handled separately by updateMapColors(), which just
+// touches existing elements' fill/class - no geometry recomputation.
 function renderMap() {
   const svg = d3.select("#map-svg");
   svg.selectAll("*").remove();
@@ -314,23 +322,12 @@ function renderMap() {
     const projection = d3.geoAlbersUsa().fitSize([width, height], nationGeo);
     const path = d3.geoPath(projection);
 
-    svg
+    countyPathSel = svg
       .append("g")
       .selectAll("path")
       .data(nationGeo.features)
       .join("path")
-      .attr("class", (d) => "county-shape" + (ratioFor(d.id, state.monthIndex) == null ? " no-data" : ""))
       .attr("d", path)
-      .attr("fill", (d) => {
-        const r = ratioFor(d.id, state.monthIndex);
-        return r == null ? null : colorScale(r);
-      })
-      .append("title")
-      .text((d) => countyTooltip(d.id));
-
-    svg
-      .select("g")
-      .selectAll("path.county-shape")
       .on("click", (event, d) => {
         state.view = "state";
         state.stateFips = d.id.slice(0, 2);
@@ -338,6 +335,7 @@ function renderMap() {
         pushHash();
         render();
       });
+    countyPathSel.append("title");
 
     svg
       .append("path")
@@ -352,23 +350,14 @@ function renderMap() {
     projection.fitSize([width, height], featureCollection);
     const path = d3.geoPath(projection);
 
-    svg
+    countyPathSel = svg
       .append("g")
       .selectAll("path")
       .data(countyFeatures)
       .join("path")
-      .attr("class", (d) => {
-        const selected = d.id === state.countyFips ? " selected" : "";
-        return "county-shape" + (ratioFor(d.id, state.monthIndex) == null ? " no-data" : "") + selected;
-      })
       .attr("d", path)
-      .attr("fill", (d) => {
-        const r = ratioFor(d.id, state.monthIndex);
-        return r == null ? null : colorScale(r);
-      })
-      .on("click", (event, d) => selectCounty(d.id))
-      .append("title")
-      .text((d) => countyTooltip(d.id));
+      .on("click", (event, d) => selectCounty(d.id));
+    countyPathSel.append("title");
 
     if (stateFeature) {
       svg
@@ -378,6 +367,26 @@ function renderMap() {
         .attr("d", path);
     }
   }
+
+  updateMapColors();
+}
+
+// Cheap per-tick update: fill color, no-data/selected classes, and tooltip
+// text on the already-built path selection. No geometry recomputation.
+function updateMapColors() {
+  if (!countyPathSel) return;
+  countyPathSel
+    .attr("class", (d) => {
+      const noData = ratioFor(d.id, state.monthIndex) == null ? " no-data" : "";
+      const selected = d.id === state.countyFips ? " selected" : "";
+      return "county-shape" + noData + selected;
+    })
+    .attr("fill", (d) => {
+      const r = ratioFor(d.id, state.monthIndex);
+      return r == null ? null : colorScale(r);
+    })
+    .select("title")
+    .text((d) => countyTooltip(d.id));
 }
 
 function countyTooltip(fips) {

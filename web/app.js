@@ -861,10 +861,19 @@ function renderDetail() {
     .domain([0, (zhviExtent[1] || 1) * 1.05])
     .range([height - margin.bottom, margin.top]);
 
+  // Price and income are on independent, decoupled scales, but both used
+  // to range over the full chart height - so whichever series happened to
+  // be nearer its own historical max at a given point would cross over and
+  // visually "win" the top of the chart, which read as if the two lines
+  // were being compared on one shared scale. Reserving the top fraction of
+  // the chart for price only means income's own peak lands lower, so the
+  // two lines stay visually stacked (price above, income below) the way
+  // people expect, without changing what either scale actually encodes.
+  const INCOME_TOP_FRACTION = 0.45; // income never draws above 45% down from the top
   const yIncome = d3
     .scaleLinear()
     .domain([0, (incomeExtent[1] || 1) * 1.05])
-    .range([height - margin.bottom, margin.top]);
+    .range([height - margin.bottom, margin.top + (height - margin.top - margin.bottom) * INCOME_TOP_FRACTION]);
 
   const g = svg.append("g");
 

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Housing Price to Income</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header id="app-header">
+  <h1 id="crumb-title">United States</h1>
+  <nav id="breadcrumb"></nav>
+</header>
+
+<main id="app-main">
+  <aside id="county-list-panel" hidden>
+    <h2>Counties</h2>
+    <input id="county-search" type="search" placeholder="Filter counties…" />
+    <ul id="county-list"></ul>
+  </aside>
+
+  <section id="map-panel">
+    <svg id="map-svg"></svg>
+    <div id="map-legend" class="legend">
+      <div class="legend-title">Price / Income ratio</div>
+      <svg id="legend-swatch" height="14"></svg>
+      <div class="legend-labels">
+        <span id="legend-min"></span>
+        <span id="legend-max"></span>
+      </div>
+      <div class="legend-note">Gray = no income data available</div>
+    </div>
+  </section>
+
+  <section id="detail-panel" hidden>
+    <h2 id="detail-title"></h2>
+    <svg id="detail-svg"></svg>
+    <div id="detail-legend" class="legend chart-legend"></div>
+  </section>
+</main>
+
+<footer id="timeline-panel">
+  <button id="play-toggle" aria-label="Play">▶</button>
+  <span id="timeline-label"></span>
+  <input id="timeline-slider" type="range" min="0" value="0" step="1" />
+</footer>
+
+<script src="vendor/d3.v7.min.js"></script>
+<script src="vendor/topojson-client.v3.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

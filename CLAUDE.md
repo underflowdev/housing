@@ -28,6 +28,20 @@ There is no build/lint/test tooling — this is a three-script data pipeline run
 
 Search the codebase for `# UPDATE:` comments — these mark the specific values/paths a user needs to edit before running (FRED key file, Zillow file path).
 
+5. **`join_diagnostics.py`** — one-off report (not part of the regular pipeline, run manually) on how much data is lost joining Zillow ↔ FRED-derived income: names FRED reports that never matched a FIPS via the NRCS crosswalk, counties present in one source but not the other, and (fips, year, qtr) tuple-level coverage. Run it after changing `data/nrcs/nrcs_fips_codes.csv` or re-fetching FRED to check whether match rate improved. As of the last pass: 3,056 of 3,071 Zillow counties matched (99.5%) — remaining gaps are ~15 Virginia jurisdictions (Fairfax County among them) that have no FRED per-capita income entry under any name, a genuine gap in FRED's own release-175 table, not a crosswalk problem.
+
+## Web visualization (`web/`)
+
+A single-page vanilla JS + D3 app (no build step, no framework) — national choropleth with a bottom timeline slider, click a county to drill into its state (county list on the left), click a county there to open a detail inset with dual-line home-value/income charts. Hash-based routing (`#/state/<fips>/<monthIndex>/county/<fips>`) rather than History API pushState, specifically because **this is meant to be deployed as a static site to S3 behind CloudFront** — hash routing needs no server-side/CloudFront rewrite rules for deep links to work, unlike pushState routing which would need a custom-error-response-to-index.html rule.
+
+- **`web_data_build.py`** — reads the Zillow CSV and `outputs/income_combined.csv` and writes `web/data/dataset.json` (counties, months, a counties×months ZHVI matrix, and per-fips-per-year income — income isn't duplicated 12x per year in the payload, the client applies each year's figure to all 12 months) plus copies `data/geo/counties-10m.json` into `web/data/`. Run it after `build_income.py`/`create_output.py`. `web/data/*.json` is gitignored (regenerated, like `outputs/*`) — run this script before serving `web/` locally or deploying it.
+- **`web/vendor/`** — D3 v7 and topojson-client, vendored (downloaded, not loaded from a CDN at runtime) so the deployed static site has no external runtime dependency.
+- **`web/app.js`** is a single file; state lives in one `state` object (`view`, `stateFips`, `countyFips`, `monthIndex`), hash ↔ state is synced both ways (`applyHash`/`pushHash`), and there's one `render()` entry point that redraws whatever's visible. Kept intentionally simple/flat rather than componentized, matching this repo's existing "don't over-engineer" style.
+- **Color scale** is fixed (not month-relative) — computed once from a 2nd/98th-percentile sample across all counties/months, so a color means the same ratio at any point on the timeline, not a re-normalized "this month's relative spread."
+- **Default month on load** is the latest month with *any* income coverage, not Zillow's own latest month — FRED's annual income lags Zillow's monthly data by a year or more, so defaulting to Zillow's latest month would show an all-gray "no data" map on first load. See `latestMonthWithIncomeData()`.
+- Counties/list entries with no income data for the selected month render gray / grayed-out text (per-month, not just per-county — a county can have data for some months and not others depending on FRED's coverage).
+- Deploying: `web/` is the entire deployable unit — sync its contents (after running `web_data_build.py`) to the S3 bucket root.
+
 ## QCEW: parked for later
 
 BLS's Quarterly Census of Employment and Wages was tried as a *quarterly* (sub-annual) income source and works end-to-end, but is currently unused — the active pipeline is FRED-only per above. If sub-annual income granularity is needed again:

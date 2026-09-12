@@ -345,8 +345,6 @@ function renderMap() {
         const r = ratioFor(d.id, state.monthIndex);
         return r == null ? null : colorScale(r);
       })
-      .attr("stroke", (d) => (d.id === state.countyFips ? "#1f1f1f" : null))
-      .attr("stroke-width", (d) => (d.id === state.countyFips ? 1.5 : null))
       .on("click", (event, d) => selectCounty(d.id))
       .append("title")
       .text((d) => countyTooltip(d.id));

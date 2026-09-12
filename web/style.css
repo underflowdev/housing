@@ -129,6 +129,12 @@ body {
 
 .county-shape:hover { stroke: #1f1f1f; stroke-width: 1px; }
 
+.county-shape.selected {
+  stroke: #1f1f1f;
+  stroke-width: 2.5px;
+  vector-effect: non-scaling-stroke;
+}
+
 .state-border {
   fill: none;
   stroke: #ffffff;

@@ -17,7 +17,6 @@ let stateGeo = null;    // GeoJSON FeatureCollection, all states
 let byFips = new Map(); // fips -> { county, index, geo }
 let statesByFips = new Map(); // 2-digit fips -> { abbr, geo }
 let colorScale = null;
-let playTimer = null;
 let countyPathSel = null; // d3 selection of the currently-drawn county <path> elements
 
 // ---------- boot ----------
@@ -182,9 +181,16 @@ function wireControls() {
 // right-hand panel(s) - the state summary is always visible in state view,
 // plus the county detail marker if a county is also selected - in sync
 // with the current month.
-function onTimelineChange() {
+//
+// `fast` (set only by the animated play loop) skips per-element tooltip
+// text and the list/summary panel rebuilds - real DOM work that isn't the
+// point of focus while the map is animating, and that otherwise competes
+// with the browser's paint budget for the map itself. Those panels catch
+// up on the next non-fast update (manual scrub, or play being paused).
+function onTimelineChange(fast) {
   updateTimelineLabel();
-  updateMapColors();
+  updateMapColors(fast);
+  if (fast) return;
   if (state.view === "nation") {
     renderNationalSummary();
   } else {
@@ -196,23 +202,47 @@ function onTimelineChange() {
   pushHash();
 }
 
-function togglePlay() {
-  const btn = document.getElementById("play-toggle");
-  if (playTimer) {
-    clearInterval(playTimer);
-    playTimer = null;
-    btn.textContent = "▶";
-    return;
-  }
-  btn.textContent = "⏸";
-  playTimer = setInterval(() => {
-    const slider = document.getElementById("timeline-slider");
+const PLAY_INTERVAL_MS = 100;
+let playing = false;
+let playLastAdvance = 0;
+
+// Paced by requestAnimationFrame, not setTimeout/setInterval on a fixed
+// clock. Measured that even a "cheap" (~10ms JS) color update can be
+// followed by a much more expensive browser paint/composite of ~3,000+
+// SVG paths - work our own JS timing never sees, since it happens after
+// the script yields. A fixed-delay timer has no way to know the browser
+// is still busy painting the previous frame, so it keeps requesting new
+// state anyway; the browser then has to coalesce/skip paints to catch up,
+// which is what showed up as "slow, then jumps 2-3 months at once".
+// rAF only calls back once the browser is actually ready to paint a new
+// frame, so we can never get further ahead than real paint capacity - at
+// worst playback runs slower than PLAY_INTERVAL_MS, which reads as
+// smooth-but-slower rather than bursty.
+function playFrame(now) {
+  if (!playing) return;
+  if (now - playLastAdvance >= PLAY_INTERVAL_MS) {
+    playLastAdvance = now;
     let next = state.monthIndex + 1;
     if (next > data.months.length - 1) next = 0;
     state.monthIndex = next;
-    slider.value = next;
-    onTimelineChange();
-  }, 100);
+    document.getElementById("timeline-slider").value = next;
+    onTimelineChange(true);
+  }
+  requestAnimationFrame(playFrame);
+}
+
+function togglePlay() {
+  const btn = document.getElementById("play-toggle");
+  playing = !playing;
+  btn.textContent = playing ? "⏸" : "▶";
+  if (playing) {
+    playLastAdvance = 0;
+    requestAnimationFrame(playFrame);
+  } else {
+    // Play skipped tooltips/list/summary updates each tick - catch them
+    // up now that we've landed on a final month.
+    onTimelineChange(false);
+  }
 }
 
 function updateTimelineLabel() {
@@ -373,7 +403,7 @@ function renderMap() {
 
 // Cheap per-tick update: fill color, no-data/selected classes, and tooltip
 // text on the already-built path selection. No geometry recomputation.
-function updateMapColors() {
+function updateMapColors(fast) {
   if (!countyPathSel) return;
   countyPathSel
     .attr("class", (d) => {
@@ -384,9 +414,13 @@ function updateMapColors() {
     .attr("fill", (d) => {
       const r = ratioFor(d.id, state.monthIndex);
       return r == null ? null : colorScale(r);
-    })
-    .select("title")
-    .text((d) => countyTooltip(d.id));
+    });
+  // Skipped during animated play: a per-element string rebuild + text-node
+  // mutation for every county, every frame, purely for an off-screen
+  // tooltip nobody can read while the map is animating anyway.
+  if (!fast) {
+    countyPathSel.select("title").text((d) => countyTooltip(d.id));
+  }
 }
 
 function countyTooltip(fips) {

@@ -1,17 +1,109 @@
 # housing vs income
 
-A very simplistic bit of Python to munge data from Zillow (https://www.zillow.com/research/data/) and BLS QCEW (https://www.bls.gov/cew/additional-resources/open-data/home.htm) and map them into a single output file, suitable for visualization.
+A small Python pipeline that joins Zillow home-value data with FRED per-capita
+income data at the US county level, producing a single tidy CSV (one row per
+county-month) suitable for visualization of home-price-to-income ratios over
+time. There's also a static web app (`web/`) that renders the result as an
+interactive choropleth.
 
 Definitely contains inaccuracies.
 
-Both sources key directly on 5-digit county FIPS codes (Zillow via its `StateCodeFIPS`/`MunicipalCodeFIPS` columns, QCEW via `area_fips`), so no manual name-crosswalk is needed. QCEW publishes average weekly wage per covered job quarterly rather than annually, so each quarter's wage is applied to all 3 months in that quarter to keep the output at Zillow's monthly granularity. The output is long/tidy (one row per county-month), not one row per county with wide date columns.
+## Setup
 
-See comments of # UPDATE: for the items that you'll need to update.
+```
+pip install -r requirements.txt
+```
 
-See qcew_fetch.py if you want to re-fetch the wage data.
+Requires `requests` and `pandas`.
 
-You'll need to download a fresh Zillow data file from https://www.zillow.com/research/data/ and put it at /data/zillow/<filename> and update paths in create_output.py, the zillow_path variable.  Remember, get the COUNTY level data.
+## 1. Get a FRED API key
 
-## Legacy FRED-based pipeline
+The income data comes from FRED (Federal Reserve Economic Data), which requires
+a free API key:
 
-`fred_fetch.py`, `data/fred/`, `data/zfmap/`, and `data/nrcs/` are the previous approach: per-capita income from FRED, hand-matched to Zillow county names via `data/zfmap/full_zf_map.csv`, annual only, and blank for 2024/2025 (worked around with a 2%/year estimate). Kept for reference but superseded by the QCEW pipeline above.
+1. Request one at https://fred.stlouisfed.org/docs/api/api_key.html
+2. Save it as a plain-text file named `fred_key.txt` in the repo root (just the
+   key, nothing else). This file is gitignored and never committed.
+
+## 2. Fetch the income data
+
+```
+python fred_fetch.py
+```
+
+This pulls per-capita personal income (FRED release 175) for every state into
+`data/fred/<State>-<year>-01-01.json`, one file per state per year. It sleeps
+2 seconds between requests to stay under FRED's crawl-delay policy, so a full
+fetch (all states, ~25 years) takes a while — use `--limit N` to do a quick
+test run first, and `--start-year`/`--end-year` to narrow the range.
+
+BEA's county income data lags real time by roughly a year, so the most recent
+year or two will often come back blank on first fetch. Re-run with `--force`
+on just those years later to check whether they've since been published:
+
+```
+python fred_fetch.py --start-year 2024 --end-year 2025 --force
+```
+
+## 3. Download the Zillow data (manual step)
+
+Zillow's data isn't available through an API, so this step is manual:
+
+1. Go to https://www.zillow.com/research/data/
+2. Download a **county-level** dataset — this pipeline was built against
+   "ZHVI All Homes (SFR, Condo/Co-op) Time Series, Smoothed, Seasonally
+   Adjusted ($), by County", but any similarly-shaped county-level Zillow CSV
+   should work.
+3. Save the file under `data/zillow/`.
+4. Open `create_output.py` and update the `zillow_path` variable (near the
+   top, marked `# UPDATE:`) to point at the file you just downloaded.
+
+## 4. Build the output
+
+```
+python build_income.py && python create_output.py
+```
+
+- `build_income.py` flattens the FRED JSON into a fips-keyed monthly income
+  table (interpolating FRED's annual figures into a smooth monthly series,
+  and extrapolating years FRED hasn't published yet using BLS QCEW wage
+  growth rates). Writes `outputs/income_combined.csv`.
+- `create_output.py` merges that with the Zillow data on `(fips, year, month)`.
+  Writes `outputs/fips_zillow_income.csv` — the final tidy output, one row per
+  county-month with a `price_to_income_ratio` column.
+
+Search the codebase for `# UPDATE:` comments to find every value/path you may
+need to edit before running.
+
+## Optional: check join coverage
+
+```
+python join_diagnostics.py
+```
+
+One-off report on how well Zillow and FRED-derived income actually match up
+(by FIPS) — useful after touching `data/nrcs/nrcs_fips_codes.csv` or
+re-fetching FRED data.
+
+## Web visualization
+
+`web/` is a static, no-build-step JS+D3 app that renders the pipeline's output
+as an interactive map. After running the pipeline above:
+
+```
+python web_data_build.py
+```
+
+This writes `web/data/dataset.json`. Then serve `web/` with any static file
+server, e.g.:
+
+```
+cd web && python3 -m http.server
+```
+
+and open it in a browser.
+
+## More detail
+
+See `CLAUDE.md` for a full architectural breakdown of each script, the FRED/
+QCEW extrapolation logic, and the web app's internals.

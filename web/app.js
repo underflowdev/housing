@@ -248,6 +248,46 @@ function wireControls() {
   });
 
   document.getElementById("map-legend").addEventListener("click", toggleColorMode);
+
+  wireCollapsibleLegends();
+}
+
+// Lets the floating legend/overview/sources boxes over the map be
+// collapsed down to just their title - they can crowd a small screen.
+// Remembered per box (by element id) in localStorage so a collapsed box
+// stays collapsed across reloads.
+function wireCollapsibleLegends() {
+  document.querySelectorAll(".collapsible").forEach((box) => {
+    const toggle = box.querySelector(".legend-collapse-toggle");
+    if (!toggle) return;
+
+    let collapsed = false;
+    try {
+      collapsed = localStorage.getItem("legendCollapsed:" + box.id) === "1";
+    } catch (e) {
+      // localStorage unavailable (private browsing etc.) - just default open
+    }
+    setLegendCollapsed(box, toggle, collapsed);
+
+    toggle.addEventListener("click", (event) => {
+      // #map-legend itself has a click handler (color-scale toggle) -
+      // don't let that also fire when the user meant to collapse it.
+      event.stopPropagation();
+      const next = !box.classList.contains("collapsed");
+      setLegendCollapsed(box, toggle, next);
+      try {
+        localStorage.setItem("legendCollapsed:" + box.id, next ? "1" : "0");
+      } catch (e) {
+        // ignore - collapse still works for this session, just won't persist
+      }
+    });
+  });
+}
+
+function setLegendCollapsed(box, toggle, collapsed) {
+  box.classList.toggle("collapsed", collapsed);
+  toggle.textContent = collapsed ? "+" : "−";
+  toggle.setAttribute("aria-label", collapsed ? "Expand" : "Collapse");
 }
 
 // Shared by the slider's own input handler and the play-loop timer: keeps

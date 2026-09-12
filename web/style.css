@@ -183,6 +183,51 @@ body {
   min-width: 160px;
 }
 
+.collapsible {
+  position: relative;
+  padding-right: 1.75rem;
+}
+
+.legend-collapse-toggle {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  line-height: 1;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--panel-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.legend-collapse-toggle:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.collapsible.collapsed {
+  min-width: 0;
+  width: auto;
+  padding: 0.4rem 1.6rem 0.4rem 0.6rem;
+}
+
+.collapsible.collapsed > *:not(.legend-collapse-toggle):not(.legend-title) {
+  /* !important: #legend-swatch (an ID selector) sets its own display:block
+     and would otherwise win over this class-based rule regardless of
+     specificity math - same class of bug as the SVG stroke/fill issue
+     elsewhere in this file. */
+  display: none !important;
+}
+
+.collapsible.collapsed .legend-title {
+  margin: 0;
+  white-space: nowrap;
+}
+
 #map-overlay {
   position: absolute;
   left: 0.75rem;
@@ -195,6 +240,15 @@ body {
 
 #map-overlay .legend {
   position: static;
+}
+
+/* Higher specificity than #map-overlay .legend above, needed so the
+   collapse-toggle button (position: absolute) anchors to this box itself
+   rather than escaping up to the next positioned ancestor (#map-panel) -
+   which two collapsible boxes in the same overlay would otherwise share,
+   landing their toggle buttons on top of each other. */
+#map-overlay .legend.collapsible {
+  position: relative;
 }
 
 .stats-legend {

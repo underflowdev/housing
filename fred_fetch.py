@@ -33,6 +33,11 @@ states = [
     {"key": "266364", "name": "Colorado"},
     {"key": "266429", "name": "Connecticut"},
     {"key": "266438", "name": "Delaware"},
+    # 266442 is also labeled "Delaware" by FRED's own table name, but its
+    # element is actually the District of Columbia - a bug in the original
+    # hand-built list here clobbered real Delaware data with this every
+    # fetch (both wrote to "Delaware-<date>.json"). Kept separate now.
+    {"key": "266442", "name": "District of Columbia"},
     {"key": "266444", "name": "Florida"},
     {"key": "266512", "name": "Georgia"},
     {"key": "266672", "name": "Hawaii"},
@@ -93,7 +98,18 @@ parser.add_argument(
     default=None,
     help="Max number of requests to make this run (for a quick test), e.g. --limit 2",
 )
+parser.add_argument(
+    "--states",
+    type=str,
+    default=None,
+    help="Comma-separated state names to fetch (default: all). E.g. --states Delaware "
+    "to re-fetch just one state's years with --force.",
+)
 args = parser.parse_args()
+
+if args.states:
+    wanted = {s.strip() for s in args.states.split(",")}
+    states = [s for s in states if s["name"] in wanted]
 
 os.makedirs("./data/fred", exist_ok=True)
 

@@ -39,6 +39,11 @@ body {
   white-space: nowrap;
 }
 
+#nation-hint {
+  margin: 0;
+  white-space: nowrap;
+}
+
 #breadcrumb {
   font-size: 0.9rem;
   color: var(--text-muted);

@@ -366,6 +366,13 @@ function togglePlay() {
   btn.textContent = playing ? "⏸" : "▶";
   if (playing) {
     playLastAdvance = 0;
+    if (state.monthIndex === data.months.length - 1) {
+      // Starting play from the end should jump straight to the start,
+      // not sit through the end-of-range pause first.
+      state.monthIndex = 0;
+      document.getElementById("timeline-slider").value = 0;
+      onTimelineChange(true);
+    }
     requestAnimationFrame(playFrame);
   } else {
     playHoldUntil = 0; // restart the full end-of-range pause if resumed later
@@ -409,10 +416,12 @@ function render() {
     detailPanel.hidden = true;
     document.getElementById("crumb-title").textContent = "United States";
     document.getElementById("national-summary").hidden = false;
+    document.getElementById("nation-hint").hidden = false;
     renderMap();
     renderNationalSummary();
   } else {
     document.getElementById("national-summary").hidden = true;
+    document.getElementById("nation-hint").hidden = true;
     listPanel.hidden = false;
     detailPanel.hidden = false;
     document.getElementById("crumb-title").textContent = stateName(state.stateFips);

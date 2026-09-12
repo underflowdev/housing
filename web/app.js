@@ -262,8 +262,10 @@ function onTimelineChange(fast) {
 }
 
 const PLAY_INTERVAL_MS = 100;
+const PLAY_END_PAUSE_MS = 5000;
 let playing = false;
 let playLastAdvance = 0;
+let playHoldUntil = 0; // 0 = not holding; else a timestamp - reaching the last month pauses here before recycling to the start
 
 // Paced by requestAnimationFrame, not setTimeout/setInterval on a fixed
 // clock. Measured that even a "cheap" (~10ms JS) color update can be
@@ -279,8 +281,19 @@ let playLastAdvance = 0;
 // smooth-but-slower rather than bursty.
 function playFrame(now) {
   if (!playing) return;
+
+  const atEnd = state.monthIndex === data.months.length - 1;
+  if (atEnd) {
+    if (playHoldUntil === 0) playHoldUntil = now + PLAY_END_PAUSE_MS; // just arrived - start the pause
+    if (now < playHoldUntil) {
+      requestAnimationFrame(playFrame);
+      return;
+    }
+  }
+
   if (now - playLastAdvance >= PLAY_INTERVAL_MS) {
     playLastAdvance = now;
+    playHoldUntil = 0;
     let next = state.monthIndex + 1;
     if (next > data.months.length - 1) next = 0;
     state.monthIndex = next;
@@ -298,6 +311,7 @@ function togglePlay() {
     playLastAdvance = 0;
     requestAnimationFrame(playFrame);
   } else {
+    playHoldUntil = 0; // restart the full end-of-range pause if resumed later
     // Play skipped tooltips/list/summary updates each tick - catch them
     // up now that we've landed on a final month.
     onTimelineChange(false);

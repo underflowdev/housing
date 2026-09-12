@@ -190,7 +190,6 @@ function wireControls() {
 function onTimelineChange(fast) {
   updateTimelineLabel();
   updateMapColors(fast);
-  if (fast) return;
   if (state.view === "nation") {
     renderNationalSummary();
   } else {
@@ -199,7 +198,9 @@ function onTimelineChange(fast) {
     renderStateSummary();
     if (state.countyFips) renderDetailMarker();
   }
-  pushHash();
+  // Skip URL churn while animating; the final month gets pushed once play
+  // pauses (see togglePlay).
+  if (!fast) pushHash();
 }
 
 const PLAY_INTERVAL_MS = 100;

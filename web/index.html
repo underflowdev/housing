@@ -71,7 +71,10 @@
 <footer id="timeline-panel">
   <button id="play-toggle" aria-label="Play">▶</button>
   <span id="timeline-label"></span>
-  <input id="timeline-slider" type="range" min="0" value="0" step="1" />
+  <div id="timeline-track">
+    <input id="timeline-slider" type="range" min="0" value="0" step="1" />
+    <svg id="timeline-scale"></svg>
+  </div>
 </footer>
 
 <script src="vendor/d3.v7.min.js"></script>

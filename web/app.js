@@ -72,6 +72,7 @@ Promise.all([
   slider.value = state.monthIndex;
 
   renderLegendSwatch();
+  renderTimelineScale();
   wireControls();
   applyHash(false);
   render();
@@ -979,6 +980,48 @@ function renderDetailLegend(hasEstimatedYears) {
 }
 
 window.addEventListener("resize", () => {
-  if (data) render();
+  if (data) {
+    render();
+    renderTimelineScale();
+  }
 });
+
+// Small year-tick scale drawn under the timeline slider, so there's a
+// sense of "where am I" without having to read the single month/year
+// label. Approximate alignment with the native <input type=range>'s
+// actual track (which insets slightly for the thumb radius at each end) -
+// close enough for a lightweight reference scale, not pixel-exact.
+function renderTimelineScale() {
+  const svg = d3.select("#timeline-scale");
+  svg.selectAll("*").remove();
+  const bounds = svg.node().getBoundingClientRect();
+  const width = bounds.width || 300;
+  svg.attr("viewBox", `0 0 ${width} 14`);
+
+  const x = d3.scaleLinear().domain([0, data.months.length - 1]).range([6, width - 6]);
+
+  // First month-index of each calendar year present in the data.
+  const yearStarts = [];
+  let lastYear = null;
+  data.months.forEach((m, i) => {
+    const year = m.slice(0, 4);
+    if (year !== lastYear) {
+      yearStarts.push({ year, index: i });
+      lastYear = year;
+    }
+  });
+
+  // Thin out to roughly one tick per ~55px so labels don't overlap.
+  const maxTicks = Math.max(2, Math.floor(width / 55));
+  const step = Math.max(1, Math.ceil(yearStarts.length / maxTicks));
+  const ticks = yearStarts.filter((_, i) => i % step === 0);
+
+  const g = svg.append("g");
+  ticks.forEach((t) => {
+    const tx = x(t.index);
+    const anchor = tx < 15 ? "start" : tx > width - 15 ? "end" : "middle";
+    g.append("line").attr("x1", tx).attr("x2", tx).attr("y1", 0).attr("y2", 4);
+    g.append("text").attr("x", tx).attr("y", 13).attr("text-anchor", anchor).text(t.year);
+  });
+}
 })();

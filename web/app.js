@@ -422,6 +422,16 @@ function renderDetail() {
     return byYear ? (byYear[year] != null ? byYear[year] : null) : null;
   });
 
+  // Years extrapolated from a QCEW growth rate rather than a real published
+  // FRED figure - flagged so the chart doesn't present an estimate as if it
+  // were identical to real data (see build_income.py / web_data_build.py).
+  const estimatedYears = new Set(data.incomeEstimatedYears[state.countyFips] || []);
+  const isEstimated = (i) => estimatedYears.has(+months[i].slice(0, 4));
+  let lastRealIndex = -1;
+  for (let i = 0; i < months.length; i++) {
+    if (incomeSeries[i] != null && !isEstimated(i)) lastRealIndex = i;
+  }
+
   const x = d3
     .scaleLinear()
     .domain([0, months.length - 1])
@@ -465,9 +475,17 @@ function renderDetail() {
     .x((d, i) => x(i))
     .y((d, i) => yPrice(zhviSeries[i]));
 
-  const incomeLine = d3
+  const incomeLineReal = d3
     .line()
-    .defined((d, i) => incomeSeries[i] != null)
+    .defined((d, i) => incomeSeries[i] != null && !isEstimated(i))
+    .x((d, i) => x(i))
+    .y((d, i) => yIncome(incomeSeries[i]));
+
+  // Overlaps the real line's last point so the estimated tail connects
+  // visually instead of leaving a gap.
+  const incomeLineEstimated = d3
+    .line()
+    .defined((d, i) => incomeSeries[i] != null && (isEstimated(i) || i === lastRealIndex))
     .x((d, i) => x(i))
     .y((d, i) => yIncome(incomeSeries[i]));
 
@@ -484,7 +502,16 @@ function renderDetail() {
     .attr("stroke", "#d69e2e")
     .attr("stroke-width", 1.6)
     .attr("stroke-dasharray", "4,2")
-    .attr("d", incomeLine);
+    .attr("d", incomeLineReal);
+
+  g.append("path")
+    .datum(months)
+    .attr("fill", "none")
+    .attr("stroke", "#d69e2e")
+    .attr("stroke-width", 1.6)
+    .attr("stroke-opacity", 0.55)
+    .attr("stroke-dasharray", "1,2")
+    .attr("d", incomeLineEstimated);
 
   g.append("line")
     .attr("id", "detail-marker")
@@ -497,7 +524,7 @@ function renderDetail() {
   svg.node()._x = x; // stash scale for the marker updater
 
   renderDetailMarker();
-  renderDetailLegend();
+  renderDetailLegend(estimatedYears.size > 0);
 }
 
 function renderDetailMarker() {
@@ -508,13 +535,21 @@ function renderDetailMarker() {
   if (!marker.empty()) marker.attr("x1", x).attr("x2", x);
 }
 
-function renderDetailLegend() {
+function renderDetailLegend(hasEstimatedYears) {
   const el = document.getElementById("detail-legend");
   el.innerHTML = "";
   const rows = [
     { color: "#2b6cb0", dash: false, label: "Home value (ZHVI, $)" },
     { color: "#d69e2e", dash: true, label: "Per-capita income ($/yr)" },
   ];
+  if (hasEstimatedYears) {
+    rows.push({
+      color: "#d69e2e",
+      dash: true,
+      faint: true,
+      label: "Income, estimated (no published figure yet)",
+    });
+  }
   rows.forEach((r) => {
     const row = document.createElement("div");
     row.className = "swatch-row";
@@ -522,6 +557,7 @@ function renderDetailLegend() {
     swatch.className = "swatch";
     swatch.style.background = r.color;
     if (r.dash) swatch.style.borderTop = "2px dashed " + r.color;
+    if (r.faint) swatch.style.opacity = "0.55";
     row.appendChild(swatch);
     const label = document.createElement("span");
     label.textContent = r.label;

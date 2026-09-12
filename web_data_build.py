@@ -6,6 +6,11 @@
 #   - zhvi: counties x months matrix of home values (null where missing)
 #   - income: {fips: {year: income_est}} - annual, applied to all 12 months
 #     client-side, so it isn't duplicated 12x in the payload
+#   - incomeEstimatedYears: {fips: [year, ...]} - years whose income_est is
+#     extrapolated from a QCEW growth rate rather than a real FRED figure
+#     (income_source starts with "fred_estimated_"), so the client can flag
+#     that portion of the income line rather than presenting it as identical
+#     to a real published figure
 #
 # Run after build_income.py / create_output.py (or standalone - it only
 # needs the Zillow CSV and outputs/income_combined.csv).
@@ -51,18 +56,21 @@ zhvi_matrix = [
 
 income = pd.read_csv(income_path, dtype={"fips": str})
 income["fips"] = income["fips"].str.zfill(5)
-income_annual = income[["fips", "year"]].drop_duplicates().assign(
-    income_est=income.groupby(["fips", "year"])["income_est"].transform("first")
-)
+income_annual = income.groupby(["fips", "year"]).first().reset_index()
+
 income_by_fips = {}
+estimated_years_by_fips = {}
 for row in income_annual.itertuples():
     income_by_fips.setdefault(row.fips, {})[str(row.year)] = round_or_none(row.income_est)
+    if str(row.income_source).startswith("fred_estimated_"):
+        estimated_years_by_fips.setdefault(row.fips, []).append(int(row.year))
 
 dataset = {
     "months": months,
     "counties": counties,
     "zhvi": zhvi_matrix,
     "income": income_by_fips,
+    "incomeEstimatedYears": estimated_years_by_fips,
 }
 
 with open(output_path, "w") as f:

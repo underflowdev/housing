@@ -184,7 +184,9 @@ function wireControls() {
 function onTimelineChange() {
   updateTimelineLabel();
   renderMap();
-  if (state.view === "state") {
+  if (state.view === "nation") {
+    renderNationalSummary();
+  } else {
     const searchTerm = document.getElementById("county-search").value.trim().toLowerCase();
     renderCountyList(searchTerm);
     renderStateSummary();
@@ -236,8 +238,11 @@ function render() {
     listPanel.hidden = true;
     detailPanel.hidden = true;
     document.getElementById("crumb-title").textContent = "United States";
+    document.getElementById("national-summary").hidden = false;
     renderMap();
+    renderNationalSummary();
   } else {
+    document.getElementById("national-summary").hidden = true;
     listPanel.hidden = false;
     detailPanel.hidden = false;
     document.getElementById("crumb-title").textContent = stateName(state.stateFips);
@@ -415,28 +420,27 @@ function renderCountyList(filterText) {
 
 // ---------- state summary (shown in the right panel when no county is selected) ----------
 
-function renderStateSummary() {
-  document.getElementById("state-summary-title").textContent = stateName(state.stateFips) + " overview";
+function countyStatsRows(filterFn) {
+  return data.counties.filter(filterFn).map((c) => {
+    const entry = byFips.get(c.fips);
+    const zhvi = data.zhvi[entry.index][state.monthIndex];
+    const year = data.months[state.monthIndex].slice(0, 4);
+    const byYear = data.income[c.fips];
+    const income = byYear ? byYear[year] : null;
+    const ratio = zhvi != null && income != null ? zhvi / income : null;
+    return { fips: c.fips, name: c.name, state: c.state, zhvi, income, ratio };
+  });
+}
 
-  const rows = data.counties
-    .filter((c) => c.fips.slice(0, 2) === state.stateFips)
-    .map((c) => {
-      const entry = byFips.get(c.fips);
-      const zhvi = data.zhvi[entry.index][state.monthIndex];
-      const year = data.months[state.monthIndex].slice(0, 4);
-      const byYear = data.income[c.fips];
-      const income = byYear ? byYear[year] : null;
-      const income_est = income != null ? income : null;
-      const ratio = zhvi != null && income_est != null ? zhvi / income_est : null;
-      return { fips: c.fips, name: c.name, zhvi, income: income_est, ratio };
-    });
+// Shared by the state and national summaries: renders the coverage /
+// highest-lowest home-value / income / ratio stat cards for whatever set
+// of county rows is passed in.
+function renderSummaryStatCards(el, rows, avgLabel) {
+  el.innerHTML = "";
 
   const withZhvi = rows.filter((r) => r.zhvi != null);
   const withIncome = rows.filter((r) => r.income != null);
   const withRatio = rows.filter((r) => r.ratio != null);
-
-  const el = document.getElementById("state-summary-stats");
-  el.innerHTML = "";
 
   addStatCard(el, "Coverage this month", [
     { label: "Counties with a ratio", value: `${withRatio.length} / ${rows.length}`, county: null },
@@ -461,9 +465,21 @@ function renderStateSummary() {
     addStatCard(el, "Price / income ratio", [
       { label: "Highest", value: maxBy(withRatio, "ratio").ratio.toFixed(2) + "x", county: maxBy(withRatio, "ratio") },
       { label: "Lowest", value: minBy(withRatio, "ratio").ratio.toFixed(2) + "x", county: minBy(withRatio, "ratio") },
-      { label: "State average", value: avgRatio.toFixed(2) + "x", county: null },
+      { label: avgLabel, value: avgRatio.toFixed(2) + "x", county: null },
     ]);
   }
+}
+
+function renderStateSummary() {
+  document.getElementById("state-summary-title").textContent = stateName(state.stateFips) + " overview";
+  const rows = countyStatsRows((c) => c.fips.slice(0, 2) === state.stateFips);
+  renderSummaryStatCards(document.getElementById("state-summary-stats"), rows, "State average");
+}
+
+function renderNationalSummary() {
+  document.getElementById("national-summary-title").textContent = "United States overview";
+  const rows = countyStatsRows(() => true);
+  renderSummaryStatCards(document.getElementById("national-summary-stats"), rows, "National average");
 }
 
 function maxBy(arr, key) {

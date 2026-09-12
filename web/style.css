@@ -183,6 +183,49 @@ body {
   min-width: 160px;
 }
 
+#map-overlay {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+#map-overlay .legend {
+  position: static;
+}
+
+.stats-legend {
+  min-width: 300px;
+  max-width: 340px;
+}
+
+.stats-legend .stat-row {
+  flex-wrap: wrap;
+  row-gap: 0.1rem;
+}
+
+.stats-legend .stat-county {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-legend .stat-value {
+  margin-left: 0.5rem;
+}
+
+.stats-legend .stat-card {
+  margin-bottom: 0.4rem;
+}
+
+.stats-legend .stat-card:last-child {
+  margin-bottom: 0;
+}
+
 .legend-title {
   font-weight: 600;
   margin-bottom: 0.3rem;

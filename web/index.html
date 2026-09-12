@@ -22,14 +22,20 @@
 
   <section id="map-panel">
     <svg id="map-svg"></svg>
-    <div id="map-legend" class="legend">
-      <div class="legend-title">Price / Income ratio</div>
-      <svg id="legend-swatch" height="14"></svg>
-      <div class="legend-labels">
-        <span id="legend-min"></span>
-        <span id="legend-max"></span>
+    <div id="map-overlay">
+      <div id="national-summary" class="legend stats-legend" hidden>
+        <div id="national-summary-title" class="legend-title"></div>
+        <div id="national-summary-stats"></div>
       </div>
-      <div class="legend-note">Gray = no data available</div>
+      <div id="map-legend" class="legend">
+        <div class="legend-title">Price / Income ratio</div>
+        <svg id="legend-swatch" height="14"></svg>
+        <div class="legend-labels">
+          <span id="legend-min"></span>
+          <span id="legend-max"></span>
+        </div>
+        <div class="legend-note">Gray = no data available</div>
+      </div>
     </div>
   </section>
 

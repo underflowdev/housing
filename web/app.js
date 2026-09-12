@@ -553,13 +553,7 @@ function renderMap() {
       .data(nationGeo.features)
       .join("path")
       .attr("d", path)
-      .on("click", (event, d) => {
-        state.view = "state";
-        state.stateFips = d.id.slice(0, 2);
-        state.countyFips = null;
-        pushHash();
-        render();
-      });
+      .on("click", (event, d) => selectCounty(d.id));
     countyPathSel.append("title");
 
     svg

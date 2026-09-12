@@ -8,6 +8,7 @@ const state = {
   stateFips: null,      // 2-digit
   countyFips: null,     // 5-digit, selected for the detail inset
   monthIndex: 0,
+  colorMode: "national", // 'national' | 'state' - state view only; nation view is always national
 };
 
 let data = null;        // { months, counties, zhvi, income }
@@ -16,8 +17,10 @@ let nationGeo = null;   // GeoJSON FeatureCollection, all counties
 let stateGeo = null;    // GeoJSON FeatureCollection, all states
 let byFips = new Map(); // fips -> { county, index, geo }
 let statesByFips = new Map(); // 2-digit fips -> { abbr, geo }
-let colorScale = null;
+let colorScale = null;         // fixed national color scale - the main map always uses this
+let stateColorScaleCache = new Map(); // stateFips -> its own color scale, built on first use
 let countyPathSel = null; // d3 selection of the currently-drawn county <path> elements
+let colorModeStateFips = null; // which state colorMode currently applies to (reset on state change)
 
 // ---------- boot ----------
 
@@ -52,7 +55,7 @@ Promise.all([
   state.monthIndex = latestMonthWithIncomeData();
   slider.value = state.monthIndex;
 
-  buildLegendSwatch();
+  renderLegendSwatch();
   wireControls();
   applyHash(false);
   render();
@@ -84,27 +87,65 @@ function latestMonthWithIncomeData() {
   return data.months.length - 1;
 }
 
-function buildColorScale() {
-  // Sample ratios across all counties/months to pick a robust domain
-  // (2nd/98th percentile) rather than let a few outlier counties wash
-  // out the color range for everyone else.
+// Samples ratios across whatever counties `fipsFilter` selects (2nd/98th
+// percentile of the sample becomes the scale's domain) so a few outlier
+// counties don't wash out the color range for everyone else.
+function sampleRatios(fipsFilter) {
+  const counties = data.counties.filter(fipsFilter);
+  const step = Math.max(1, Math.floor(counties.length / 400)); // subsample if there are many
   const samples = [];
-  const step = Math.max(1, Math.floor(data.counties.length / 400)); // subsample counties
-  for (let ci = 0; ci < data.counties.length; ci += step) {
-    const fips = data.counties[ci].fips;
+  for (let ci = 0; ci < counties.length; ci += step) {
+    const fips = counties[ci].fips;
     for (let mi = 0; mi < data.months.length; mi += 6) {
       const r = ratioFor(fips, mi);
       if (r != null && isFinite(r)) samples.push(r);
     }
   }
-  samples.sort((a, b) => a - b);
-  const lo = samples[Math.floor(samples.length * 0.02)];
-  const hi = samples[Math.floor(samples.length * 0.98)];
-  return d3.scaleSequential(d3.interpolateBlues).domain([lo, hi]).clamp(true);
+  return samples;
 }
 
-function buildLegendSwatch() {
+function scaleFromSamples(samples, interpolator) {
+  samples = samples.slice().sort((a, b) => a - b);
+  const lo = samples.length ? samples[Math.floor(samples.length * 0.02)] : 0;
+  const hi = samples.length ? samples[Math.floor(samples.length * 0.98)] : 1;
+  return d3.scaleSequential(interpolator).domain([lo, hi]).clamp(true);
+}
+
+function buildColorScale() {
+  return scaleFromSamples(sampleRatios(() => true), d3.interpolateBlues);
+}
+
+// A state's own counties can have far less ratio spread than the whole
+// country, so the fixed national scale can leave a low-variation state
+// (e.g. Kansas) looking nearly uniform. This builds (and caches) a scale
+// from just that state's own counties, in a visually distinct color
+// scheme so it's never mistaken for the national one.
+function getStateColorScale(stateFips) {
+  if (!stateColorScaleCache.has(stateFips)) {
+    const samples = sampleRatios((c) => c.fips.slice(0, 2) === stateFips);
+    stateColorScaleCache.set(stateFips, scaleFromSamples(samples, d3.interpolateOranges));
+  }
+  return stateColorScaleCache.get(stateFips);
+}
+
+// The scale actually used to color the map right now: the state view's own
+// scale only when the user has toggled it on for the current state; the
+// national map, and state view by default, always use the fixed national
+// scale (per requirement - only the state-view toggle can opt into the
+// state-relative scale).
+function activeColorScale() {
+  if (state.view === "state" && state.colorMode === "state") {
+    return getStateColorScale(state.stateFips);
+  }
+  return colorScale;
+}
+
+function renderLegendSwatch() {
+  const scale = activeColorScale();
+  const [lo, hi] = scale.domain();
+
   const svg = d3.select("#legend-swatch");
+  svg.selectAll("*").remove();
   const width = 140;
   svg.attr("width", width);
   const defs = svg.append("defs");
@@ -113,16 +154,36 @@ function buildLegendSwatch() {
   const stops = 10;
   for (let i = 0; i <= stops; i++) {
     const t = i / stops;
-    const [lo, hi] = colorScale.domain();
     grad
       .append("stop")
       .attr("offset", `${t * 100}%`)
-      .attr("stop-color", colorScale(lo + t * (hi - lo)));
+      .attr("stop-color", scale(lo + t * (hi - lo)));
   }
   svg.append("rect").attr("width", width).attr("height", 14).attr("fill", `url(#${gradId})`);
-  const [lo, hi] = colorScale.domain();
   document.getElementById("legend-min").textContent = lo.toFixed(1) + "x";
   document.getElementById("legend-max").textContent = hi.toFixed(1) + "x";
+
+  const isStateScale = state.view === "state" && state.colorMode === "state";
+  document.getElementById("legend-title").textContent =
+    "Price / Income ratio" + (isStateScale ? " — this state" : "");
+
+  const legendEl = document.getElementById("map-legend");
+  legendEl.classList.toggle("clickable", state.view === "state");
+
+  const toggleHint = document.getElementById("legend-toggle-hint");
+  toggleHint.hidden = state.view !== "state";
+  if (state.view === "state") {
+    toggleHint.textContent = isStateScale
+      ? "Colored by this state's own range — click for national scale"
+      : "Colored by the national range — click for this state's own scale";
+  }
+}
+
+function toggleColorMode() {
+  if (state.view !== "state") return;
+  state.colorMode = state.colorMode === "state" ? "national" : "state";
+  renderLegendSwatch();
+  updateMapColors();
 }
 
 // ---------- routing (hash-based, safe for static S3 hosting) ----------
@@ -174,6 +235,8 @@ function wireControls() {
   document.getElementById("county-search").addEventListener("input", (e) => {
     renderCountyList(e.target.value.trim().toLowerCase());
   });
+
+  document.getElementById("map-legend").addEventListener("click", toggleColorMode);
 }
 
 // Shared by the slider's own input handler and the play-loop timer: keeps
@@ -261,6 +324,15 @@ function render() {
   document.getElementById("timeline-slider").value = state.monthIndex;
   updateTimelineLabel();
   renderBreadcrumb();
+
+  // The state color-scale toggle is per-state, transient UI state - reset
+  // to the national scale whenever landing on a different state (or
+  // leaving state view) so it never silently carries over and confuses a
+  // freshly-opened state.
+  if (state.stateFips !== colorModeStateFips) {
+    state.colorMode = "national";
+    colorModeStateFips = state.stateFips;
+  }
 
   const listPanel = document.getElementById("county-list-panel");
   const detailPanel = document.getElementById("detail-panel");
@@ -399,6 +471,7 @@ function renderMap() {
     }
   }
 
+  renderLegendSwatch();
   updateMapColors();
 }
 
@@ -406,6 +479,7 @@ function renderMap() {
 // text on the already-built path selection. No geometry recomputation.
 function updateMapColors(fast) {
   if (!countyPathSel) return;
+  const scale = activeColorScale();
   countyPathSel
     .attr("class", (d) => {
       const noData = ratioFor(d.id, state.monthIndex) == null ? " no-data" : "";
@@ -414,7 +488,7 @@ function updateMapColors(fast) {
     })
     .attr("fill", (d) => {
       const r = ratioFor(d.id, state.monthIndex);
-      return r == null ? null : colorScale(r);
+      return r == null ? null : scale(r);
     });
   // Skipped during animated play: a per-element string rebuild + text-node
   // mutation for every county, every frame, purely for an off-screen

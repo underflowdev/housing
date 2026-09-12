@@ -281,6 +281,18 @@ body {
   color: var(--text-muted);
 }
 
+#map-legend.clickable {
+  cursor: pointer;
+}
+
+#map-legend.clickable:hover {
+  border-color: var(--accent);
+}
+
+#legend-toggle-hint {
+  font-style: italic;
+}
+
 .chart-legend {
   position: static;
   margin-top: 0.5rem;

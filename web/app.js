@@ -68,20 +68,14 @@ function ratioFor(fips, monthIndex) {
   if (!entry) return null;
   const zhvi = data.zhvi[entry.index][monthIndex];
   if (zhvi == null) return null;
-  const year = data.months[monthIndex].slice(0, 4);
-  const incomeByYear = data.income[fips];
-  const income = incomeByYear ? incomeByYear[year] : null;
+  const income = data.income[entry.index][monthIndex];
   if (income == null) return null;
   return zhvi / income;
 }
 
 function latestMonthWithIncomeData() {
   for (let mi = data.months.length - 1; mi >= 0; mi--) {
-    const year = data.months[mi].slice(0, 4);
-    const hasAny = data.counties.some((c) => {
-      const byYear = data.income[c.fips];
-      return byYear && byYear[year] != null;
-    });
+    const hasAny = data.income.some((row) => row[mi] != null);
     if (hasAny) return mi;
   }
   return data.months.length - 1;
@@ -543,9 +537,7 @@ function countyStatsRows(filterFn) {
   return data.counties.filter(filterFn).map((c) => {
     const entry = byFips.get(c.fips);
     const zhvi = data.zhvi[entry.index][state.monthIndex];
-    const year = data.months[state.monthIndex].slice(0, 4);
-    const byYear = data.income[c.fips];
-    const income = byYear ? byYear[year] : null;
+    const income = data.income[entry.index][state.monthIndex];
     const ratio = zhvi != null && income != null ? zhvi / income : null;
     return { fips: c.fips, name: c.name, state: c.state, zhvi, income, ratio };
   });
@@ -666,11 +658,7 @@ function renderDetail() {
 
   const months = data.months;
   const zhviSeries = months.map((m, i) => data.zhvi[entry.index][i]);
-  const incomeSeries = months.map((m) => {
-    const year = m.slice(0, 4);
-    const byYear = data.income[state.countyFips];
-    return byYear ? (byYear[year] != null ? byYear[year] : null) : null;
-  });
+  const incomeSeries = months.map((m, i) => data.income[entry.index][i]);
 
   // Years extrapolated from a QCEW growth rate rather than a real published
   // FRED figure - flagged so the chart doesn't present an estimate as if it

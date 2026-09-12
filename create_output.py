@@ -43,19 +43,21 @@ zillow_long = zillow[id_cols + date_cols].melt(
 )
 zillow_long["date"] = pd.to_datetime(zillow_long["date"])
 zillow_long["year"] = zillow_long["date"].dt.year
-zillow_long["qtr"] = zillow_long["date"].dt.quarter
+zillow_long["month"] = zillow_long["date"].dt.month
 # Explicit year-month key (e.g. "2023-01") for consumers that key off a single
 # global timestamp (e.g. a choropleth's time slider), rather than parsing "date".
 zillow_long["year_month"] = zillow_long["date"].dt.strftime("%Y-%m")
 
-# --- income: pre-combined by build_income.py (fips, year, qtr, income_est, income_source) ---
+# --- income: pre-combined by build_income.py, monthly (fips, year, month, income_est, income_source) ---
+# Already interpolated between annual anchors - see build_income.py - so
+# this is a genuine month-by-month income series, not a flat per-year value.
 
 income = pd.read_csv(income_path, dtype={"fips": str})
 income["fips"] = income["fips"].str.zfill(5)
 
-# --- merge on (fips, year, qtr): each quarterly income figure maps to its 3 zillow months ---
+# --- merge on (fips, year, month): both sides are already monthly ---
 
-final = pd.merge(zillow_long, income, on=["fips", "year", "qtr"], how="left")
+final = pd.merge(zillow_long, income, on=["fips", "year", "month"], how="left")
 
 final["price_to_income_ratio"] = final["zhvi"] / final["income_est"]
 
@@ -67,7 +69,7 @@ final = final[
         "year_month",
         "date",
         "year",
-        "qtr",
+        "month",
         "zhvi",
         "income_est",
         "income_source",

@@ -101,15 +101,15 @@ zlong = zillow[["fips"] + date_cols].melt(id_vars="fips", var_name="date", value
 zlong["date"] = pd.to_datetime(zlong["date"])
 zlong = zlong[(zlong["date"].dt.year >= min_income_year) & (zlong["date"].dt.year <= max_income_year)]
 zlong["year"] = zlong["date"].dt.year
-zlong["qtr"] = zlong["date"].dt.quarter
-z_tuples = zlong[["fips", "year", "qtr"]].drop_duplicates()
+zlong["month"] = zlong["date"].dt.month
+z_tuples = zlong[["fips", "year", "month"]].drop_duplicates()
 
-i_tuples = income[["fips", "year", "qtr"]].drop_duplicates()
+i_tuples = income[["fips", "year", "month"]].drop_duplicates()
 
-merged = pd.merge(z_tuples, i_tuples, on=["fips", "year", "qtr"], how="outer", indicator=True)
+merged = pd.merge(z_tuples, i_tuples, on=["fips", "year", "month"], how="outer", indicator=True)
 counts = merged["_merge"].value_counts()
 
-print(f"=== (fips, year, qtr) tuple coverage, restricted to {min_income_year}-{max_income_year} (FRED's full data range) ===")
+print(f"=== (fips, year, month) tuple coverage, restricted to {min_income_year}-{max_income_year} (FRED's full data range) ===")
 print(f"Matched (both):                         {counts.get('both', 0)}")
 print(f"Zillow has a tuple, income is missing:   {counts.get('left_only', 0)}")
 print(f"Income has a tuple, Zillow is missing:   {counts.get('right_only', 0)}")
@@ -126,7 +126,7 @@ overlap_end = max_income_year
 
 o_i_tuples = i_tuples[(i_tuples["year"] >= overlap_start) & (i_tuples["year"] <= overlap_end)]
 o_z_tuples = z_tuples[(z_tuples["year"] >= overlap_start) & (z_tuples["year"] <= overlap_end)]
-overlap_merged = pd.merge(o_z_tuples, o_i_tuples, on=["fips", "year", "qtr"], how="outer", indicator=True)
+overlap_merged = pd.merge(o_z_tuples, o_i_tuples, on=["fips", "year", "month"], how="outer", indicator=True)
 overlap_counts = overlap_merged["_merge"].value_counts()
 
 print(f"=== Same, restricted to the actual overlap range {overlap_start}-{overlap_end} ===")

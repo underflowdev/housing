@@ -1,6 +1,12 @@
-# Builds a fips-keyed, quarterly-granularity income table from FRED
-# per-capita personal income (annual data, broadcast across all 4 quarters
-# of each year so it merges the same way a quarterly source would).
+# Builds a fips-keyed, MONTHLY income table from FRED per-capita personal
+# income (published annually). Rather than broadcasting each year's figure
+# flat across its 12 months (a step function - visibly "jumps" at every
+# year boundary, both in a per-county chart and at the choropleth's yearly
+# color transitions), each annual figure is anchored at the middle of its
+# year (July 1) and linearly interpolated between consecutive years' anchors
+# to produce a smooth monthly series. Months before the first anchor or
+# after the last hold flat at the nearest anchor's value (no invented
+# trend beyond the known data range).
 #
 # FRED's own income data is not currently published for years beyond
 # FRED_MAX_YEAR below (BEA's county personal income release lags roughly a
@@ -10,14 +16,16 @@
 # recently: county rate if QCEW has that county both years, else state
 # rate, else national rate. This is a rate transfer, not splicing QCEW
 # levels into FRED's series (see the QCEW section in CLAUDE.md for why
-# mixing levels directly would be a methodology break).
+# mixing levels directly would be a methodology break). The interpolation
+# happens after this step, so the estimated years become anchors too.
 #
-# Output: outputs/income_combined.csv (fips, year, qtr, income_est, income_source)
+# Output: outputs/income_combined.csv (fips, year, month, income_est, income_source)
 
 import glob
 import json
 import os
 
+import numpy as np
 import pandas as pd
 
 fred_data_dir = "./data/fred"
@@ -172,8 +180,43 @@ if qcew_files:
     if extrapolated_rows:
         fred = pd.concat([fred, pd.DataFrame(extrapolated_rows)], ignore_index=True)
 
-# One row per fips/year -> expand to all 4 quarters so downstream code can
-# merge on (fips, year, qtr) the same way it would against a quarterly source.
-income = pd.concat([fred.assign(qtr=q) for q in (1, 2, 3, 4)], ignore_index=True)
-income = income.sort_values(["fips", "year", "qtr"])
+# --- interpolate annual anchors (one per fips/year, including the
+# --- extrapolated years above) into a smooth monthly series ---
+
+min_year = int(fred["year"].min())
+max_year = int(fred["year"].max())
+# Mid-month fractional-year position for every (year, month) in range -
+# same x-axis convention as the anchors (each anchored at year + 0.5).
+target_years = np.repeat(np.arange(min_year, max_year + 1), 12)
+target_months = np.tile(np.arange(1, 13), max_year - min_year + 1)
+target_x = target_years + (target_months - 0.5) / 12
+
+monthly_rows = []
+for county_fips, grp in fred.groupby("fips"):
+    grp = grp.sort_values("year")
+    anchor_x = grp["year"].to_numpy(dtype=float) + 0.5
+    anchor_y = grp["income_est"].to_numpy()
+    anchor_source = grp["income_source"].to_numpy()
+
+    interp_y = np.interp(target_x, anchor_x, anchor_y)
+    # Tag each interpolated month with its nearest anchor's source, so an
+    # interpolated month between a real year and a QCEW-rate-estimated year
+    # still reads as (mostly) one or the other rather than losing that
+    # distinction entirely.
+    nearest_idx = np.abs(anchor_x[:, None] - target_x[None, :]).argmin(axis=0)
+
+    monthly_rows.append(
+        pd.DataFrame(
+            {
+                "fips": county_fips,
+                "year": target_years,
+                "month": target_months,
+                "income_est": interp_y,
+                "income_source": anchor_source[nearest_idx],
+            }
+        )
+    )
+
+income = pd.concat(monthly_rows, ignore_index=True)
+income = income.sort_values(["fips", "year", "month"])
 income.to_csv(output_path, index=False, float_format="%11.3f")

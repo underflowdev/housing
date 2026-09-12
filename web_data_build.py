@@ -4,8 +4,9 @@
 #   - months: ordered ["YYYY-MM", ...] covering Zillow's full range
 #   - counties: [{fips, name, state}, ...]
 #   - zhvi: counties x months matrix of home values (null where missing)
-#   - income: {fips: {year: income_est}} - annual, applied to all 12 months
-#     client-side, so it isn't duplicated 12x in the payload
+#   - income: counties x months matrix of income (same shape as zhvi) -
+#     already interpolated month-by-month in build_income.py, not a flat
+#     per-year value, so the client doesn't need any year-level logic
 #   - incomeEstimatedYears: {fips: [year, ...]} - years whose income_est is
 #     extrapolated from a QCEW growth rate rather than a real FRED figure
 #     (income_source starts with "fred_estimated_"), so the client can flag
@@ -56,20 +57,29 @@ zhvi_matrix = [
 
 income = pd.read_csv(income_path, dtype={"fips": str})
 income["fips"] = income["fips"].str.zfill(5)
-income_annual = income.groupby(["fips", "year"]).first().reset_index()
+income["year_month"] = income["year"].astype(str) + "-" + income["month"].astype(str).str.zfill(2)
 
-income_by_fips = {}
-estimated_years_by_fips = {}
-for row in income_annual.itertuples():
-    income_by_fips.setdefault(row.fips, {})[str(row.year)] = round_or_none(row.income_est)
-    if str(row.income_source).startswith("fred_estimated_"):
-        estimated_years_by_fips.setdefault(row.fips, []).append(int(row.year))
+# One row per (fips, year_month) already (see build_income.py), so this
+# pivot is exact - no aggregation needed, just reshaping.
+income_pivot = income.pivot(index="fips", columns="year_month", values="income_est")
+income_pivot = income_pivot.reindex(index=[c["fips"] for c in counties], columns=months)
+
+income_matrix = [
+    [round_or_none(v) for v in row] for row in income_pivot.itertuples(index=False)
+]
+
+estimated = income[income["income_source"].str.startswith("fred_estimated_")]
+estimated_years_by_fips = (
+    estimated.groupby("fips")["year"]
+    .apply(lambda years: sorted(int(y) for y in years.unique()))
+    .to_dict()
+)
 
 dataset = {
     "months": months,
     "counties": counties,
     "zhvi": zhvi_matrix,
-    "income": income_by_fips,
+    "income": income_matrix,
     "incomeEstimatedYears": estimated_years_by_fips,
 }
 

@@ -59,7 +59,20 @@
     <div id="county-detail" hidden>
       <h2 id="detail-title"></h2>
       <p id="detail-no-data" class="hint" hidden>No home value or income data is available for this county.</p>
-      <svg id="detail-svg"></svg>
+      <div id="detail-charts">
+        <div class="detail-chart">
+          <div class="detail-chart-title">Home value (ZHVI, $)</div>
+          <svg id="detail-svg-price" class="detail-chart-svg"></svg>
+        </div>
+        <div class="detail-chart">
+          <div class="detail-chart-title">Per-capita income ($/yr)</div>
+          <svg id="detail-svg-income" class="detail-chart-svg"></svg>
+        </div>
+        <div class="detail-chart">
+          <div class="detail-chart-title">Price / income ratio</div>
+          <svg id="detail-svg-ratio" class="detail-chart-svg"></svg>
+        </div>
+      </div>
       <div id="detail-legend" class="legend chart-legend"></div>
     </div>
     <hr id="detail-divider" hidden />

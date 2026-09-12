@@ -1,3 +1,4 @@
+import argparse
 import os
 import time
 
@@ -20,14 +21,30 @@ OWN_CODE_TOTAL = 0
 INDUSTRY_CODE_TOTAL = "10"
 
 out_dir = "./data/qcew"
+
+parser = argparse.ArgumentParser(description="Fetch county-level QCEW average weekly wage data.")
+# The QCEW Open Data API (as opposed to BLS's bulk downloadable files) only serves
+# 2014 Q1 onward; earlier years 404. Confirmed directly against the API.
+parser.add_argument("--start-year", type=int, default=2014)
+parser.add_argument("--end-year", type=int, default=2025)
+parser.add_argument(
+    "--limit",
+    type=int,
+    default=None,
+    help="Max number of year/quarter files to fetch this run (for a quick test), e.g. --limit 2",
+)
+args = parser.parse_args()
+
 os.makedirs(out_dir, exist_ok=True)
 
-start_year = 2001
-end_year = 2025
 quarters = ["1", "2", "3", "4"]
 
-for year in range(start_year, end_year + 1):
+fetch_count = 0
+for year in range(args.start_year, args.end_year + 1):
     for qtr in quarters:
+        if args.limit is not None and fetch_count >= args.limit:
+            break
+
         out_path = f"{out_dir}/qcew_{year}_q{qtr}.csv"
         if os.path.exists(out_path):
             continue
@@ -36,6 +53,7 @@ for year in range(start_year, end_year + 1):
         r = requests.get(url)
         if r.status_code != 200:
             print(f"skip {year} q{qtr}: HTTP {r.status_code}")
+            fetch_count += 1
             time.sleep(1)
             continue
 
@@ -55,4 +73,8 @@ for year in range(start_year, end_year + 1):
         os.remove(raw_path)
 
         print(out_path)
+        fetch_count += 1
         time.sleep(1)
+    else:
+        continue
+    break

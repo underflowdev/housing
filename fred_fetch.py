@@ -1,100 +1,126 @@
-import requests
+import argparse
+import os
 import time
 
+import requests
 
-fred_base = 'https://api.stlouisfed.org/fred/release/tables'
-# UPDATE: add your api key.  You can request one from FRED, start at https://fred.stlouisfed.org/docs/api/fred/
-# TODO: this code uses the Version 1 API, the Version 2 API might be more useful? 
-api_key = "your api key here"
-file_type = 'json'
-include_observation_values = 'true'
+fred_base = "https://api.stlouisfed.org/fred/release/tables"
 
-release_id = '175'
-element_id = '266159'
-observation_date = '2001-01-01'
+# UPDATE: put your FRED API key in fred_key.txt (gitignored).
+# Request one from https://fred.stlouisfed.org/docs/api/api_key.html
+with open("fred_key.txt") as f:
+    api_key = f.read().strip()
 
-# foreach element_id (which is the state)
-#    foreach year from 2000 to 2021
-#       delay
-#       request
+file_type = "json"
+include_observation_values = "true"
+
+release_id = "175"
 
 payload = {
-    'api_key': api_key,
-    'file_type': file_type,
-    'include_observation_values': include_observation_values,
-    'release_id': release_id,
-    'element_id': element_id,
-    'observation_date': observation_date
+    "api_key": api_key,
+    "file_type": file_type,
+    "include_observation_values": include_observation_values,
+    "release_id": release_id,
 }
+
+# fmt: off
 states = [
-    {'key': '266091', 'name': 'Alabama'},
-    {'key': '266159', 'name': 'Alaska'},
-    {'key': '266213', 'name': 'Arizona'},
-    {'key': '266229', 'name': 'Arkansas'},
-    {'key': '266305', 'name': 'California'},
-    {'key': '266364', 'name': 'Colorado'},
-    {'key': '266429', 'name': 'Connecticut'},
-    {'key': '266438', 'name': 'Delaware'},
-    {'key': '266442', 'name': 'Delaware'},
-    {'key': '266444', 'name': 'Florida'},
-    {'key': '266512', 'name': 'Georgia'},
-    {'key': '266672', 'name': 'Hawaii'},
-    {'key': '266677', 'name': 'Idaho'},
-    {'key': '266722', 'name': 'Illinois'},
-    {'key': '266825', 'name': 'Indiana'},
-    {'key': '266918', 'name': 'Iowa'},
-    {'key': '267018', 'name': 'Kansas'},
-    {'key': '267124', 'name': 'Kentucky'},
-    {'key': '267245', 'name': 'Louisiana'},
-    {'key': '267310', 'name': 'Maine'},
-    {'key': '267327', 'name': 'Maryland'},
-    {'key': '267352', 'name': 'Massachusetts'},
-    {'key': '267367', 'name': 'Michigan'},
-    {'key': '267451', 'name': 'Minnesota'},
-    {'key': '267539', 'name': 'Mississippi'},
-    {'key': '267622', 'name': 'Missouri'},
-    {'key': '267738', 'name': 'Montana'},
-    {'key': '267795', 'name': 'Nebraska'},
-    {'key': '267889', 'name': 'Nevada'},
-    {'key': '267907', 'name': 'New Hampshire'},
-    {'key': '267918', 'name': 'New Jersey'},
-    {'key': '267940', 'name': 'New Mexico'},
-    {'key': '267974', 'name': 'New York'},
-    {'key': '268037', 'name': 'North Carolina'},
-    {'key': '268138', 'name': 'North Dakota'},
-    {'key': '268192', 'name': 'Ohio'},
-    {'key': '268281', 'name': 'Oklahoma'},
-    {'key': '268359', 'name': 'Oregon'},
-    {'key': '268396', 'name': 'Pennsylvania'},
-    {'key': '268464', 'name': 'Rhode Island'},
-    {'key': '268470', 'name': 'South Carolina'},
-    {'key': '268517', 'name': 'South Dakota'},
-    {'key': '268584', 'name': 'Tennessee'},
-    {'key': '268680', 'name': 'Texas'},
-    {'key': '268935', 'name': 'Utah'},
-    {'key': '268965', 'name': 'Vermont'},
-    {'key': '268980', 'name': 'Virginia'},
-    {'key': '269081', 'name': 'Washington'},
-    {'key': '269121', 'name': 'West Virginia'},
-    {'key': '269177', 'name': 'Wisconsin'},
-    {'key': '269251', 'name': 'Wyoming'}
+    {"key": "266091", "name": "Alabama"},
+    {"key": "266159", "name": "Alaska"},
+    {"key": "266213", "name": "Arizona"},
+    {"key": "266229", "name": "Arkansas"},
+    {"key": "266305", "name": "California"},
+    {"key": "266364", "name": "Colorado"},
+    {"key": "266429", "name": "Connecticut"},
+    {"key": "266438", "name": "Delaware"},
+    {"key": "266444", "name": "Florida"},
+    {"key": "266512", "name": "Georgia"},
+    {"key": "266672", "name": "Hawaii"},
+    {"key": "266677", "name": "Idaho"},
+    {"key": "266722", "name": "Illinois"},
+    {"key": "266825", "name": "Indiana"},
+    {"key": "266918", "name": "Iowa"},
+    {"key": "267018", "name": "Kansas"},
+    {"key": "267124", "name": "Kentucky"},
+    {"key": "267245", "name": "Louisiana"},
+    {"key": "267310", "name": "Maine"},
+    {"key": "267327", "name": "Maryland"},
+    {"key": "267352", "name": "Massachusetts"},
+    {"key": "267367", "name": "Michigan"},
+    {"key": "267451", "name": "Minnesota"},
+    {"key": "267539", "name": "Mississippi"},
+    {"key": "267622", "name": "Missouri"},
+    {"key": "267738", "name": "Montana"},
+    {"key": "267795", "name": "Nebraska"},
+    {"key": "267889", "name": "Nevada"},
+    {"key": "267907", "name": "New Hampshire"},
+    {"key": "267918", "name": "New Jersey"},
+    {"key": "267940", "name": "New Mexico"},
+    {"key": "267974", "name": "New York"},
+    {"key": "268037", "name": "North Carolina"},
+    {"key": "268138", "name": "North Dakota"},
+    {"key": "268192", "name": "Ohio"},
+    {"key": "268281", "name": "Oklahoma"},
+    {"key": "268359", "name": "Oregon"},
+    {"key": "268396", "name": "Pennsylvania"},
+    {"key": "268464", "name": "Rhode Island"},
+    {"key": "268470", "name": "South Carolina"},
+    {"key": "268517", "name": "South Dakota"},
+    {"key": "268584", "name": "Tennessee"},
+    {"key": "268680", "name": "Texas"},
+    {"key": "268935", "name": "Utah"},
+    {"key": "268965", "name": "Vermont"},
+    {"key": "268980", "name": "Virginia"},
+    {"key": "269081", "name": "Washington"},
+    {"key": "269121", "name": "West Virginia"},
+    {"key": "269177", "name": "Wisconsin"},
+    {"key": "269251", "name": "Wyoming"},
 ]
+# fmt: on
 
-start_date = 2001
-end_date = 2025
-dates = []
-while start_date < end_date:
-    dates.append(f'{str(start_date)}-01-01')
-    start_date += 1
+parser = argparse.ArgumentParser(description="Fetch county-level per-capita income data from FRED.")
+parser.add_argument("--start-year", type=int, default=2001)
+parser.add_argument("--end-year", type=int, default=2025)
+parser.add_argument(
+    "--force",
+    action="store_true",
+    help="Re-fetch and overwrite years that already have a file (e.g. to check if a "
+    "previously-blank year has since been published).",
+)
+parser.add_argument(
+    "--limit",
+    type=int,
+    default=None,
+    help="Max number of requests to make this run (for a quick test), e.g. --limit 2",
+)
+args = parser.parse_args()
 
+os.makedirs("./data/fred", exist_ok=True)
 
+dates = [f"{year}-01-01" for year in range(args.start_year, args.end_year + 1)]
+
+# fred.stlouisfed.org's robots.txt declares Crawl-delay: 2 for api.stlouisfed.org -
+# stricter than this project's 1 req/sec policy floor, so we honor the stricter one.
+REQUEST_DELAY_SECONDS = 2
+
+fetch_count = 0
 for date in dates:
+    if args.limit is not None and fetch_count >= args.limit:
+        break
     for state in states:
-        time.sleep(1)
-        payload['observation_date'] = date
-        payload['element_id'] = state.get('key')
-        r = requests.get(fred_base, params=payload)
+        if args.limit is not None and fetch_count >= args.limit:
+            break
+
         path = f'./data/fred/{state.get("name")}-{date}.json'
+        if os.path.exists(path) and not args.force:
+            continue
+
+        payload["observation_date"] = date
+        payload["element_id"] = state.get("key")
+        r = requests.get(fred_base, params=payload)
         print(path)
         with open(path, "w") as outfile:
             outfile.write(r.text)
+
+        fetch_count += 1
+        time.sleep(REQUEST_DELAY_SECONDS)

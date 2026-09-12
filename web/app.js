@@ -583,7 +583,7 @@ function countyStatsRows(filterFn) {
 // Shared by the state and national summaries: renders the coverage /
 // highest-lowest home-value / income / ratio stat cards for whatever set
 // of county rows is passed in.
-function renderSummaryStatCards(el, rows, avgLabel) {
+function renderSummaryStatCards(el, rows, avgLabel, totalCount) {
   el.innerHTML = "";
 
   const withZhvi = rows.filter((r) => r.zhvi != null);
@@ -591,7 +591,7 @@ function renderSummaryStatCards(el, rows, avgLabel) {
   const withRatio = rows.filter((r) => r.ratio != null);
 
   addStatCard(el, "Coverage this month", [
-    { label: "Counties with a ratio", value: `${withRatio.length} / ${rows.length}`, county: null },
+    { label: "Counties with a ratio", value: `${withRatio.length} / ${totalCount}`, county: null },
   ]);
 
   if (withZhvi.length) {
@@ -625,13 +625,18 @@ function renderSummaryStatCards(el, rows, avgLabel) {
 function renderStateSummary() {
   document.getElementById("state-summary-title").textContent = stateName(state.stateFips) + " overview";
   const rows = countyStatsRows((c) => c.fips.slice(0, 2) === state.stateFips);
-  renderSummaryStatCards(document.getElementById("state-summary-stats"), rows, "State average");
+  // Total counties in this state per the map (every real county), not per
+  // Zillow's list - Zillow doesn't cover every county (e.g. Jackson County,
+  // CO), so using data.counties.length as the denominator understated the
+  // true gap and could read as "100% coverage" when it wasn't.
+  const totalCount = nationGeo.features.filter((f) => f.id.slice(0, 2) === state.stateFips).length;
+  renderSummaryStatCards(document.getElementById("state-summary-stats"), rows, "State average", totalCount);
 }
 
 function renderNationalSummary() {
   document.getElementById("national-summary-title").textContent = "United States overview";
   const rows = countyStatsRows(() => true);
-  renderSummaryStatCards(document.getElementById("national-summary-stats"), rows, "National average");
+  renderSummaryStatCards(document.getElementById("national-summary-stats"), rows, "National average", nationGeo.features.length);
 }
 
 function maxBy(arr, key) {

@@ -100,7 +100,7 @@ function buildColorScale() {
   samples.sort((a, b) => a - b);
   const lo = samples[Math.floor(samples.length * 0.02)];
   const hi = samples[Math.floor(samples.length * 0.98)];
-  return d3.scaleSequential(d3.interpolateViridis).domain([lo, hi]).clamp(true);
+  return d3.scaleSequential(d3.interpolateBlues).domain([lo, hi]).clamp(true);
 }
 
 function buildLegendSwatch() {
@@ -198,7 +198,7 @@ function togglePlay() {
     renderMap();
     renderDetailMarker();
     pushHash();
-  }, 400);
+  }, 200);
 }
 
 function updateTimelineLabel() {

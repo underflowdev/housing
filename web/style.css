@@ -225,6 +225,12 @@ body {
   display: inline-block;
 }
 
+#detail-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1rem 0;
+}
+
 .hint {
   font-size: 0.8rem;
   color: var(--text-muted);

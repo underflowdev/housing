@@ -177,20 +177,18 @@ function wireControls() {
 }
 
 // Shared by the slider's own input handler and the play-loop timer: keeps
-// the map, county list (its no-data graying is month-dependent), and
-// whichever right-hand panel is showing (state summary or county detail
-// marker) all in sync with the current month.
+// the map, county list (its no-data graying is month-dependent), and the
+// right-hand panel(s) - the state summary is always visible in state view,
+// plus the county detail marker if a county is also selected - in sync
+// with the current month.
 function onTimelineChange() {
   updateTimelineLabel();
   renderMap();
   if (state.view === "state") {
     const searchTerm = document.getElementById("county-search").value.trim().toLowerCase();
     renderCountyList(searchTerm);
-    if (state.countyFips) {
-      renderDetailMarker();
-    } else {
-      renderStateSummary();
-    }
+    renderStateSummary();
+    if (state.countyFips) renderDetailMarker();
   }
   pushHash();
 }
@@ -232,7 +230,6 @@ function render() {
 
   const listPanel = document.getElementById("county-list-panel");
   const detailPanel = document.getElementById("detail-panel");
-  const stateSummaryEl = document.getElementById("state-summary");
   const countyDetailEl = document.getElementById("county-detail");
 
   if (state.view === "nation") {
@@ -246,15 +243,15 @@ function render() {
     document.getElementById("crumb-title").textContent = stateName(state.stateFips);
     renderCountyList("");
     renderMap();
-    if (state.countyFips) {
-      stateSummaryEl.hidden = true;
-      countyDetailEl.hidden = false;
-      renderDetail();
-    } else {
-      stateSummaryEl.hidden = false;
-      countyDetailEl.hidden = true;
-      renderStateSummary();
-    }
+
+    // The state summary stays visible even with a county selected, per
+    // request - the divider and hint text just delineate the two sections.
+    const hasCounty = !!state.countyFips;
+    document.getElementById("detail-divider").hidden = !hasCounty;
+    document.getElementById("state-summary-hint").hidden = hasCounty;
+    countyDetailEl.hidden = !hasCounty;
+    if (hasCounty) renderDetail();
+    renderStateSummary();
   }
 }
 

@@ -15,7 +15,8 @@ let data = null;        // { months, counties, zhvi, income }
 let rawTopo = null;     // raw TopoJSON topology (needed for mesh())
 let nationGeo = null;   // GeoJSON FeatureCollection, all counties
 let stateGeo = null;    // GeoJSON FeatureCollection, all states
-let byFips = new Map(); // fips -> { county, index, geo }
+let byFips = new Map(); // fips -> { county, index, geo } - only counties Zillow covers
+let countyNameByFips = new Map(); // fips -> {name, state} - every county in the map, including ones Zillow doesn't cover
 let statesByFips = new Map(); // 2-digit fips -> { abbr, geo }
 let colorScale = null;         // fixed national color scale - the main map always uses this
 let stateColorScaleCache = new Map(); // stateFips -> its own color scale, built on first use
@@ -42,6 +43,21 @@ Promise.all([
     // topojson state ids are 2-digit FIPS; grab an abbr from any county in it
     const anyCounty = data.counties.find((c) => c.fips.slice(0, 2) === f.id);
     statesByFips.set(f.id, { abbr: anyCounty ? anyCounty.state : f.id, geo: f });
+  });
+  // The map (TopoJSON) has every US county; Zillow's dataset - and so
+  // byFips - only has the ~3,071 it reports ZHVI for. A handful of small
+  // counties (e.g. Jackson County, CO) are on the map but have no Zillow
+  // data at all, so byFips has nothing for them. This fallback name/state
+  // lookup covers every county on the map, so those still display
+  // sensibly instead of silently failing wherever byFips is checked.
+  nationGeo.features.forEach((f) => {
+    if (!countyNameByFips.has(f.id)) {
+      const stateAbbr = statesByFips.get(f.id.slice(0, 2));
+      countyNameByFips.set(f.id, {
+        name: f.properties && f.properties.name ? f.properties.name : f.id,
+        state: stateAbbr ? stateAbbr.abbr : f.id.slice(0, 2),
+      });
+    }
   });
 
   colorScale = buildColorScale();
@@ -405,9 +421,8 @@ function renderBreadcrumb() {
 
     if (state.countyFips) {
       el.appendChild(document.createTextNode(" › "));
-      const entry = byFips.get(state.countyFips);
       const span = document.createElement("span");
-      span.textContent = entry ? entry.county.name : state.countyFips;
+      span.textContent = countyDisplayInfo(state.countyFips).name;
       el.appendChild(span);
     }
   }
@@ -507,18 +522,26 @@ function updateMapColors(fast) {
   }
 }
 
-function countyTooltip(fips) {
+// {name, state} for any county on the map, whether or not Zillow covers it.
+function countyDisplayInfo(fips) {
   const entry = byFips.get(fips);
-  if (!entry) return fips;
+  if (entry) return { name: entry.county.name, state: entry.county.state };
+  return countyNameByFips.get(fips) || { name: fips, state: "" };
+}
+
+function countyTooltip(fips) {
+  const { name, state: st } = countyDisplayInfo(fips);
+  const label = `${name}, ${st}`;
   const r = ratioFor(fips, state.monthIndex);
-  const label = `${entry.county.name}, ${entry.county.state}`;
   return r == null ? `${label}\nNo data available` : `${label}\n${r.toFixed(2)}x price/income`;
 }
 
 function selectCounty(fips) {
   state.countyFips = fips;
-  const entry = byFips.get(fips);
-  if (entry) state.stateFips = fips.slice(0, 2);
+  // Derive from the FIPS itself (first 2 digits = state), not from
+  // byFips - a county Zillow doesn't cover (e.g. Jackson County, CO)
+  // still has a real state and should still navigate there correctly.
+  state.stateFips = fips.slice(0, 2);
   state.view = "state";
   pushHash();
   render();
@@ -662,9 +685,32 @@ function addStatCard(container, title, items) {
 // ---------- detail inset (dual-line chart: zhvi + income, real values) ----------
 
 function renderDetail() {
+  const { name, state: st } = countyDisplayInfo(state.countyFips);
+  document.getElementById("detail-title").textContent = `${name}, ${st}`;
+
   const entry = byFips.get(state.countyFips);
-  if (!entry) return;
-  document.getElementById("detail-title").textContent = `${entry.county.name}, ${entry.county.state}`;
+  const noDataEl = document.getElementById("detail-no-data");
+  const svgEl = document.getElementById("detail-svg");
+  const legendEl = document.getElementById("detail-legend");
+  if (!entry) {
+    // Zillow doesn't cover every county (e.g. Jackson County, CO) - say so
+    // plainly instead of leaving the chart blank or showing a stale
+    // previous county's data.
+    //
+    // Note: <svg> is an SVGElement, not an HTMLElement - setting .hidden
+    // on it does NOT reflect to the "hidden" content attribute the way it
+    // does for ordinary elements, so our CSS [hidden] rule never matches
+    // and the element stays visible. Use setAttribute/removeAttribute
+    // directly instead, which works for both.
+    noDataEl.hidden = false;
+    svgEl.setAttribute("hidden", "");
+    svgEl._x = null; // clear any stashed scale from a previously-selected real county
+    legendEl.hidden = true;
+    return;
+  }
+  noDataEl.hidden = true;
+  svgEl.removeAttribute("hidden");
+  legendEl.hidden = false;
 
   const svg = d3.select("#detail-svg");
   svg.selectAll("*").remove();

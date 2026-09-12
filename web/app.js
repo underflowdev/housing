@@ -470,6 +470,54 @@ function renderBreadcrumb() {
 
 // ---------- map ----------
 
+// True if this feature set has points on both sides of the antimeridian
+// (longitude both > 150 and < -150) - a specific enough heuristic that no
+// other US state's geometry can trigger it, only Alaska's.
+function crossesAntimeridian(features) {
+  let hasFarEast = false;
+  let hasFarWest = false;
+  const check = (node) => {
+    if (typeof node[0] === "number") {
+      if (node[0] > 150) hasFarEast = true;
+      else if (node[0] < -150) hasFarWest = true;
+    } else {
+      for (const child of node) check(child);
+    }
+  };
+  for (const f of features) {
+    check(f.geometry.coordinates);
+    if (hasFarEast && hasFarWest) return true;
+  }
+  return false;
+}
+
+// d3 projections normalize/wrap longitude as part of the standard
+// spherical projection math, so manually shifting raw coordinates outside
+// -180..180 gets silently wrapped right back - it does NOT fix the
+// antimeridian crossing. The actual fix is to rotate the projection so its
+// own reference meridian (where it "cuts" the sphere) lands away from the
+// real landmass, then project the ORIGINAL coordinates as normal - fitSize
+// computes its bounding box from the already-projected (and thus
+// already-rotated) points, so this works with no coordinate mutation at
+// all. This estimates a good rotation center: shift far-east points (e.g.
+// Aleutians read as +172) down by 360deg just long enough to average them
+// together with the rest of Alaska's (already-negative) longitudes into
+// one contiguous number line, purely to compute that center.
+function antimeridianRotationCenter(features) {
+  let sum = 0;
+  let count = 0;
+  const visit = (node) => {
+    if (typeof node[0] === "number") {
+      sum += node[0] > 90 ? node[0] - 360 : node[0];
+      count += 1;
+    } else {
+      for (const child of node) visit(child);
+    }
+  };
+  for (const f of features) visit(f.geometry.coordinates);
+  return count ? sum / count : 0;
+}
+
 // Rebuilds the map geometry from scratch: projection, path generation for
 // every county polygon, click handlers, state border. This is the
 // expensive part (measured ~270-300ms at national scope for 3,231
@@ -512,7 +560,24 @@ function renderMap() {
   } else {
     const stateFeature = stateGeo.features.find((f) => f.id === state.stateFips);
     const countyFeatures = nationGeo.features.filter((f) => f.id.slice(0, 2) === state.stateFips);
+
     const projection = d3.geoMercator();
+    // Alaska's Aleutian Islands cross the antimeridian (180th meridian) -
+    // the raw longitudes span from ~-179 to ~+179 (the far-west Aleutians
+    // read as small positive numbers, everything else as large negative
+    // ones), so fitSize's default bounding box spans almost the entire
+    // globe and Alaska renders as a tiny sliver instead of filling the
+    // panel. (The national view doesn't have this problem because
+    // d3.geoAlbersUsa() special-cases Alaska into a fixed inset; plain
+    // geoMercator has no such handling.) Fixed by rotating the projection's
+    // own reference meridian away from the real landmass, rather than
+    // mutating coordinates - the latter doesn't work because d3 projections
+    // normalize/wrap longitude as part of the standard spherical math, so a
+    // manually-shifted coordinate outside -180..180 just gets wrapped
+    // straight back.
+    if (crossesAntimeridian(countyFeatures)) {
+      projection.rotate([-antimeridianRotationCenter(countyFeatures), 0]);
+    }
     const featureCollection = { type: "FeatureCollection", features: countyFeatures };
     projection.fitSize([width, height], featureCollection);
     const path = d3.geoPath(projection);

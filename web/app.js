@@ -896,7 +896,10 @@ function renderDetail() {
 
   drawMiniChart("detail-svg-ratio", {
     width,
-    margin,
+    // Only margin.left/right need to match the other charts (that's what
+    // keeps the shared x scale aligned) - bottom can be taller here to fit
+    // this chart's tick labels, since it's the only one showing them.
+    margin: { ...margin, bottom: 20 },
     x,
     months,
     showXAxis: true,

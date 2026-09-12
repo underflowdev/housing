@@ -380,7 +380,7 @@ function countyTooltip(fips) {
   if (!entry) return fips;
   const r = ratioFor(fips, state.monthIndex);
   const label = `${entry.county.name}, ${entry.county.state}`;
-  return r == null ? `${label}\nNo income data available` : `${label}\n${r.toFixed(2)}x price/income`;
+  return r == null ? `${label}\nNo data available` : `${label}\n${r.toFixed(2)}x price/income`;
 }
 
 function selectCounty(fips) {

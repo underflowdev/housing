@@ -2818,8 +2818,8 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 50025,Windham,VT,Windham County
 50027,Windsor,VT,Windsor County
 51001,Accomack,VA,Accomack County
-51003,Albemarle,VA,Albemarle County
-51005,Alleghany,VA,Alleghany County
+51003,Albemarle,VA,Albemarle County + Charlottesville City
+51005,Alleghany,VA,Alleghany County + Covington City
 51007,Amelia,VA,Amelia County
 51009,Amherst,VA,Amherst County
 51011,Appomattox,VA,Appomattox County
@@ -2832,9 +2832,9 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 51025,Brunswick,VA,Brunswick County
 51027,Buchanan,VA,Buchanan County
 51029,Buckingham,VA,Buckingham County
-51031,Campbell,VA,Campbell County
+51031,Campbell,VA,Campbell County + Lynchburg City
 51033,Caroline,VA,Caroline County
-51035,Carroll,VA,Carroll County
+51035,Carroll,VA,Carroll County + Galax City
 51036,Charles City,VA,Charles City County
 51037,Charlotte,VA,Charlotte County
 51041,Chesterfield,VA,Chesterfield County
@@ -2850,20 +2850,20 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 51063,Floyd,VA,Floyd County
 51065,Fluvanna,VA,Fluvanna County
 51067,Franklin,VA,Franklin County
-51069,Frederick,VA,Frederick County
+51069,Frederick,VA,Frederick County + Winchester City
 51071,Giles,VA,Giles County
 51073,Gloucester,VA,Gloucester County
 51075,Goochland,VA,Goochland County
 51077,Grayson,VA,Grayson County
 51079,Greene,VA,Greene County
-51081,Greensville,VA,Greensville County
+51081,Greensville,VA,Greensville County + Emporia City
 51083,Halifax,VA,Halifax County
 51085,Hanover,VA,Hanover County
 51087,Henrico,VA,Henrico County
-51089,Henry,VA,Henry County
+51089,Henry,VA,Henry County + Martinsville City
 51091,Highland,VA,Highland County
 51093,Isle of Wight,VA,Isle of Wight County
-51095,James City,VA,James City County
+51095,James City,VA,James City County + Williamsburg City
 51097,King and Queen,VA,King and Queen County
 51099,King George,VA,King George County
 51101,King William,VA,King William County
@@ -2876,7 +2876,7 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 51115,Mathews,VA,Mathews County
 51117,Mecklenburg,VA,Mecklenburg County
 51119,Middlesex,VA,Middlesex County
-51121,Montgomery,VA,Montgomery County
+51121,Montgomery,VA,Montgomery County + Radford City
 51125,Nelson,VA,Nelson County
 51127,New Kent,VA,New Kent County
 51131,Northampton,VA,Northampton County
@@ -2885,33 +2885,33 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 51137,Orange,VA,Orange County
 51139,Page,VA,Page County
 51141,Patrick,VA,Patrick County
-51143,Pittsylvania,VA,Pittsylvania County
+51143,Pittsylvania,VA,Pittsylvania County + Danville City
 51145,Powhatan,VA,Powhatan County
 51147,Prince Edward,VA,Prince Edward County
-51149,Prince George,VA,Prince George County
+51149,Prince George,VA,Prince George County + Hopewell City
 51153,Prince William,VA,Prince William County
 51155,Pulaski,VA,Pulaski County
 51157,Rappahannock,VA,Rappahannock County
 51159,Richmond,VA,Richmond County
-51161,Roanoke,VA,Roanoke County
+51161,Roanoke,VA,Roanoke County + Salem City
 51163,Rockbridge,VA,Rockbridge County
-51165,Rockingham,VA,Rockingham County
+51165,Rockingham,VA,Rockingham County + Harrisonburg City
 51167,Russell,VA,Russell County
 51169,Scott,VA,Scott County
 51171,Shenandoah,VA,Shenandoah County
 51173,Smyth,VA,Smyth County
-51175,Southampton,VA,Southampton County
-51177,Spotsylvania,VA,Spotsylvania County
+51175,Southampton,VA,Southampton County + Franklin City
+51177,Spotsylvania,VA,Spotsylvania County + Fredericksburg City
 51179,Stafford,VA,Stafford County
 51181,Surry,VA,Surry County
 51183,Sussex,VA,Sussex County
 51185,Tazewell,VA,Tazewell County
 51187,Warren,VA,Warren County
-51191,Washington,VA,Washington County
+51191,Washington,VA,Washington County + Bristol City
 51193,Westmoreland,VA,Westmoreland County
-51195,Wise,VA,Wise County
+51195,Wise,VA,Wise County + Norton City
 51197,Wythe,VA,Wythe County
-51199,York,VA,York County
+51199,York,VA,York County + Poquoson City
 51510,Alexandria City,VA,Alexandria City County
 51515,Bedford City,VA,Bedford City County
 51520,Bristol City,VA,Bristol City County
@@ -3234,3 +3234,31 @@ nrcs_fips,nrcs_county_bare,nrcs_abbr,nrcs_county
 78030,St. Thomas,VI,St. Thomas County
 08014,Broomfield,CO,Broomfield County/city
 15009,Maui + Kalawao,HI,Maui + Kalawao Counties
+51540,Charlottesville,VA,Albemarle County + Charlottesville City
+51580,Covington,VA,Alleghany County + Covington City
+51680,Lynchburg,VA,Campbell County + Lynchburg City
+51640,Galax,VA,Carroll County + Galax City
+51840,Winchester,VA,Frederick County + Winchester City
+51595,Emporia,VA,Greensville County + Emporia City
+51690,Martinsville,VA,Henry County + Martinsville City
+51830,Williamsburg,VA,James City County + Williamsburg City
+51750,Radford,VA,Montgomery County + Radford City
+51590,Danville,VA,Pittsylvania County + Danville City
+51670,Hopewell,VA,Prince George County + Hopewell City
+51775,Salem,VA,Roanoke County + Salem City
+51660,Harrisonburg,VA,Rockingham County + Harrisonburg City
+51620,Franklin,VA,Southampton County + Franklin City
+51630,Fredericksburg,VA,Spotsylvania County + Fredericksburg City
+51520,Bristol,VA,Washington County + Bristol City
+51720,Norton,VA,Wise County + Norton City
+51735,Poquoson,VA,York County + Poquoson City
+51510,Alexandria,VA,Alexandria city
+51550,Chesapeake,VA,Chesapeake city
+51650,Hampton,VA,Hampton city
+51700,Newport News,VA,Newport News city
+51710,Norfolk,VA,Norfolk city
+51740,Portsmouth,VA,Portsmouth city
+51760,Richmond,VA,Richmond city
+51770,Roanoke,VA,Roanoke city
+51800,Suffolk,VA,Suffolk city
+51810,Virginia Beach,VA,Virginia Beach city

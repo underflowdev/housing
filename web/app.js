@@ -42,7 +42,8 @@ Promise.all([
   stateGeo.features.forEach((f) => {
     // topojson state ids are 2-digit FIPS; grab an abbr from any county in it
     const anyCounty = data.counties.find((c) => c.fips.slice(0, 2) === f.id);
-    statesByFips.set(f.id, { abbr: anyCounty ? anyCounty.state : f.id, geo: f });
+    const fullName = f.properties && f.properties.name ? f.properties.name : f.id;
+    statesByFips.set(f.id, { abbr: anyCounty ? anyCounty.state : f.id, name: fullName, geo: f });
   });
   // The map (TopoJSON) has every US county; Zillow's dataset - and so
   // byFips - only has the ~3,071 it reports ZHVI for. A handful of small
@@ -424,7 +425,7 @@ function render() {
     document.getElementById("nation-hint").hidden = true;
     listPanel.hidden = false;
     detailPanel.hidden = false;
-    document.getElementById("crumb-title").textContent = stateName(state.stateFips);
+    document.getElementById("crumb-title").textContent = stateFullName(state.stateFips);
     renderCountyList("");
     renderMap();
 
@@ -442,6 +443,11 @@ function render() {
 function stateName(fips) {
   const s = statesByFips.get(fips);
   return s ? s.abbr : fips;
+}
+
+function stateFullName(fips) {
+  const s = statesByFips.get(fips);
+  return s ? s.name : fips;
 }
 
 function renderBreadcrumb() {

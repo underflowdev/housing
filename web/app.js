@@ -701,7 +701,12 @@ function countyStatsRows(filterFn) {
 // Shared by the state and national summaries: renders the coverage /
 // highest-lowest home-value / income / ratio stat cards for whatever set
 // of county rows is passed in.
-function renderSummaryStatCards(el, rows, avgLabel, totalCount) {
+// showState: append each named county's state abbreviation (e.g.
+// "Nantucket County, MA") - only meaningful for the national summary,
+// where counties can otherwise be ambiguous (many states have their own
+// "Washington County"); every county in the state summary is already in
+// the same state, so it'd just be noise there.
+function renderSummaryStatCards(el, rows, avgLabel, totalCount, showState) {
   el.innerHTML = "";
 
   const withZhvi = rows.filter((r) => r.zhvi != null);
@@ -710,7 +715,7 @@ function renderSummaryStatCards(el, rows, avgLabel, totalCount) {
 
   addStatCard(el, "Coverage this month", [
     { label: "Counties with a ratio", value: `${withRatio.length} / ${totalCount}`, county: null },
-  ]);
+  ], showState);
 
   if (withZhvi.length) {
     const avgZhvi = withZhvi.reduce((sum, r) => sum + r.zhvi, 0) / withZhvi.length;
@@ -718,7 +723,7 @@ function renderSummaryStatCards(el, rows, avgLabel, totalCount) {
       { label: "Highest", value: fmtDollar(maxBy(withZhvi, "zhvi").zhvi), county: maxBy(withZhvi, "zhvi") },
       { label: "Lowest", value: fmtDollar(minBy(withZhvi, "zhvi").zhvi), county: minBy(withZhvi, "zhvi") },
       { label: avgLabel, value: fmtDollar(avgZhvi), county: null },
-    ]);
+    ], showState);
   }
 
   if (withIncome.length) {
@@ -727,7 +732,7 @@ function renderSummaryStatCards(el, rows, avgLabel, totalCount) {
       { label: "Highest", value: fmtDollar(maxBy(withIncome, "income").income), county: maxBy(withIncome, "income") },
       { label: "Lowest", value: fmtDollar(minBy(withIncome, "income").income), county: minBy(withIncome, "income") },
       { label: avgLabel, value: fmtDollar(avgIncome), county: null },
-    ]);
+    ], showState);
   }
 
   if (withRatio.length) {
@@ -736,7 +741,7 @@ function renderSummaryStatCards(el, rows, avgLabel, totalCount) {
       { label: "Highest", value: maxBy(withRatio, "ratio").ratio.toFixed(2) + "x", county: maxBy(withRatio, "ratio") },
       { label: "Lowest", value: minBy(withRatio, "ratio").ratio.toFixed(2) + "x", county: minBy(withRatio, "ratio") },
       { label: avgLabel, value: avgRatio.toFixed(2) + "x", county: null },
-    ]);
+    ], showState);
   }
 }
 
@@ -748,13 +753,13 @@ function renderStateSummary() {
   // CO), so using data.counties.length as the denominator understated the
   // true gap and could read as "100% coverage" when it wasn't.
   const totalCount = nationGeo.features.filter((f) => f.id.slice(0, 2) === state.stateFips).length;
-  renderSummaryStatCards(document.getElementById("overview-stats"), rows, "State average", totalCount);
+  renderSummaryStatCards(document.getElementById("overview-stats"), rows, "State average", totalCount, false);
 }
 
 function renderNationalSummary() {
   document.getElementById("overview-title").textContent = "United States overview";
   const rows = countyStatsRows(() => true);
-  renderSummaryStatCards(document.getElementById("overview-stats"), rows, "National average", nationGeo.features.length);
+  renderSummaryStatCards(document.getElementById("overview-stats"), rows, "National average", nationGeo.features.length, true);
 }
 
 function maxBy(arr, key) {
@@ -769,7 +774,7 @@ function fmtDollar(v) {
   return "$" + d3.format(",.0f")(v);
 }
 
-function addStatCard(container, title, items) {
+function addStatCard(container, title, items, showState) {
   const card = document.createElement("div");
   card.className = "stat-card";
   const heading = document.createElement("div");
@@ -788,7 +793,11 @@ function addStatCard(container, title, items) {
 
     const countyName = document.createElement("span");
     countyName.className = "stat-county";
-    countyName.textContent = item.county ? item.county.name : "";
+    countyName.textContent = item.county
+      ? showState
+        ? `${item.county.name}, ${item.county.state}`
+        : item.county.name
+      : "";
     row.appendChild(countyName);
 
     const value = document.createElement("span");

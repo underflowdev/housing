@@ -269,6 +269,26 @@ body {
   position: relative;
 }
 
+/* In state view, #map-legend and #sources-legend are moved (see
+   relocateLegends() in app.js) out of the floating map overlay into the
+   side panel's normal document flow. Needs position: relative (not
+   static) rather than the plain flow #map-overlay's children get - the
+   collapse-toggle button is itself position: absolute and anchors to
+   the nearest positioned ancestor, which needs to stay this box and not
+   escape to #detail-panel (or further) the way #sources-legend's own
+   position: absolute + right/bottom would otherwise take it. Also drops
+   the width caps that made sense floating over a map but not sitting in
+   a 380px-wide panel. */
+#detail-panel .legend {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  margin: 0.75rem 0;
+  min-width: 0;
+  max-width: none;
+}
+
 .stats-legend {
   min-width: 300px;
   max-width: 340px;

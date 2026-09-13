@@ -170,22 +170,32 @@ body {
   margin: 0 0 0.5rem;
 }
 
-#detail-svg {
+#detail-charts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.detail-chart-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.1rem;
+}
+
+.detail-chart-svg {
   width: 100%;
-  height: 260px;
+  height: 120px;
   display: block;
 }
 
 .legend {
-  position: absolute;
-  left: 0.75rem;
-  bottom: 0.75rem;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--panel-bg);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.5rem 0.65rem;
+  margin: 0.75rem 0;
   font-size: 0.75rem;
-  min-width: 160px;
 }
 
 .collapsible {
@@ -233,80 +243,29 @@ body {
   white-space: nowrap;
 }
 
-#map-overlay {
-  position: absolute;
-  left: 0.75rem;
-  bottom: 0.75rem;
-  display: flex;
-  flex-direction: column-reverse;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-
-#map-overlay .legend {
-  position: static;
-}
-
-/* Higher specificity than #map-overlay .legend above, needed so the
-   collapse-toggle button (position: absolute) anchors to this box itself
-   rather than escaping up to the next positioned ancestor (#map-panel) -
-   which two collapsible boxes in the same overlay would otherwise share,
-   landing their toggle buttons on top of each other. */
-#map-overlay .legend.collapsible {
-  position: relative;
-}
-
-.stats-legend {
-  min-width: 300px;
-  max-width: 340px;
-}
-
-.stats-legend .stat-row {
+#overview-stats .stat-row {
   flex-wrap: wrap;
   row-gap: 0.1rem;
 }
 
-.stats-legend .stat-county {
+#overview-stats .stat-county {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.stats-legend .stat-value {
+#overview-stats .stat-value {
   margin-left: 0.5rem;
 }
 
-.stats-legend .stat-card {
-  margin-bottom: 0.4rem;
-}
-
-.stats-legend .stat-card:last-child {
-  margin-bottom: 0;
-}
-
 .sources-legend {
-  position: absolute;
-  right: 0.75rem;
-  bottom: 0.75rem;
-  left: auto;
-  max-width: 260px;
   font-size: 0.68rem;
   line-height: 1.4;
 }
 
-.sources-legend ul {
+.sources-legend p {
   margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.sources-legend li {
-  margin-bottom: 0.3rem;
-}
-
-.sources-legend li:last-child {
-  margin-bottom: 0;
 }
 
 .sources-legend a {
@@ -342,10 +301,12 @@ body {
 
 #map-legend.clickable {
   cursor: pointer;
+  border-width: 2px;
+  border-color: var(--accent);
 }
 
 #map-legend.clickable:hover {
-  border-color: var(--accent);
+  background: rgba(43, 108, 176, 0.05);
 }
 
 #legend-toggle-hint {
@@ -372,27 +333,31 @@ body {
   display: inline-block;
 }
 
-#detail-divider {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 1rem 0;
-}
-
 .hint {
   font-size: 0.8rem;
   color: var(--text-muted);
   margin: 0 0 0.75rem;
 }
 
-#state-summary-stats {
-  margin: 0;
+#overview-section {
+  margin-bottom: 0.6rem;
+}
+
+/* One card per stat (coverage, home value, income, ratio) instead of one
+   box holding all of them - each is its own flex item here so they can
+   wrap freely, rather than being nested inside a single wrapping box. */
+#overview-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
 }
 
 .stat-card {
+  flex: 1 1 200px;
   border: 1px solid var(--border);
   border-radius: 6px;
+  background: var(--panel-bg);
   padding: 0.5rem 0.65rem;
-  margin-bottom: 0.6rem;
 }
 
 .stat-card-title {
@@ -431,11 +396,47 @@ body {
 
 #timeline-panel {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 0.6rem;
   padding: 0.6rem 1.25rem;
   border-top: 1px solid var(--border);
   background: var(--panel-bg);
+  max-height: 45vh;
+  overflow-y: auto;
+}
+
+#timeline-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* The ratio legend and data sources - previously floating over the map
+   in every view, now living here instead (alongside #overview-section
+   above) so the map (wider than it is tall, especially at the national
+   level) gets the full width of #app-main to itself in both views.
+   Ratio legend is the smaller of the two (a color bar + two numbers)
+   so it gets 1/3 of the row, data sources (a list of links) gets 2/3 -
+   flex-basis 0 with those grow ratios splits any leftover space that
+   way once both fit on one line; below that they wrap to full width,
+   1/3-first, in source order. */
+#info-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+
+#info-row #map-legend {
+  flex: 1 1 240px;
+}
+
+#info-row #sources-legend {
+  flex: 2 1 320px;
+}
+
+#info-row .legend {
+  margin: 0;
 }
 
 #play-toggle {
@@ -482,3 +483,64 @@ body {
 }
 
 [hidden] { display: none !important; }
+
+/* Nation view is just the map now - no side panel competing with it for
+   width at all, in any screen size, since the ratio legend/overview/data
+   sources all moved to the footer's #info-row. State view still has
+   #county-list-panel (240px, fixed) + #detail-panel (380px, fixed)
+   though, which together can leave the map a sliver or nothing below
+   ~920px (min-width: 0 lets its flex-basis go to zero) - stack those into
+   one scrollable column instead, map first with a real height of its own.
+   Scoped (via :has) to when #detail-panel is actually visible - i.e.
+   state view - so nation view's map keeps using the full #app-main
+   height at every width instead of leaving unused space below a
+   height-capped map with nothing else there to fill it. */
+@media (max-width: 920px) {
+  #app-header {
+    flex-wrap: wrap;
+    row-gap: 0.15rem;
+  }
+
+  #app-main:has(#detail-panel:not([hidden])) {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  #app-main:has(#detail-panel:not([hidden])) #county-list-panel {
+    order: 2;
+    width: 100%;
+    max-height: 200px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  #app-main:has(#detail-panel:not([hidden])) #map-panel {
+    order: 1;
+    flex: none;
+    width: 100%;
+    height: 55vh;
+    min-height: 260px;
+  }
+
+  #app-main:has(#detail-panel:not([hidden])) #detail-panel {
+    order: 3;
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
+  /* Same specificity (2 ids) as the #info-row #map-legend/#sources-legend
+     rules above so this actually overrides their flex-basis instead of
+     losing to them regardless of source order. */
+  #info-row #map-legend,
+  #info-row #sources-legend {
+    flex-basis: 100%;
+  }
+
+  /* .stat-card's flex-basis: 200px lets two fit per row around this
+     width, giving an awkward 2x2 grid instead of a clean single-column
+     stack - force full width instead. */
+  #overview-stats .stat-card {
+    flex-basis: 100%;
+  }
+}

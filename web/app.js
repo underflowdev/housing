@@ -42,7 +42,8 @@ Promise.all([
   stateGeo.features.forEach((f) => {
     // topojson state ids are 2-digit FIPS; grab an abbr from any county in it
     const anyCounty = data.counties.find((c) => c.fips.slice(0, 2) === f.id);
-    statesByFips.set(f.id, { abbr: anyCounty ? anyCounty.state : f.id, geo: f });
+    const fullName = f.properties && f.properties.name ? f.properties.name : f.id;
+    statesByFips.set(f.id, { abbr: anyCounty ? anyCounty.state : f.id, name: fullName, geo: f });
   });
   // The map (TopoJSON) has every US county; Zillow's dataset - and so
   // byFips - only has the ~3,071 it reports ZHVI for. A handful of small
@@ -411,28 +412,31 @@ function render() {
   const detailPanel = document.getElementById("detail-panel");
   const countyDetailEl = document.getElementById("county-detail");
 
+  // The overview section and the ratio legend/data sources row live in
+  // the footer in both views now (see index.html) - always visible
+  // there, out of the map's way entirely, rather than floating over it
+  // or sharing width with it in a side panel. #overview-section has a
+  // single title/stats target reused by both renderNationalSummary() and
+  // renderStateSummary() (only one of which ever runs at a time), rather
+  // than two separate boxes toggled by hidden. #detail-panel is now just
+  // the per-county charts, so it only exists in state view.
   if (state.view === "nation") {
     listPanel.hidden = true;
     detailPanel.hidden = true;
     document.getElementById("crumb-title").textContent = "United States";
-    document.getElementById("national-summary").hidden = false;
     document.getElementById("nation-hint").hidden = false;
     renderMap();
     renderNationalSummary();
   } else {
-    document.getElementById("national-summary").hidden = true;
     document.getElementById("nation-hint").hidden = true;
     listPanel.hidden = false;
     detailPanel.hidden = false;
-    document.getElementById("crumb-title").textContent = stateName(state.stateFips);
+    document.getElementById("crumb-title").textContent = stateFullName(state.stateFips);
     renderCountyList("");
     renderMap();
 
-    // The state summary stays visible even with a county selected, per
-    // request - the divider and hint text just delineate the two sections.
     const hasCounty = !!state.countyFips;
-    document.getElementById("detail-divider").hidden = !hasCounty;
-    document.getElementById("state-summary-hint").hidden = hasCounty;
+    document.getElementById("detail-empty-hint").hidden = hasCounty;
     countyDetailEl.hidden = !hasCounty;
     if (hasCounty) renderDetail();
     renderStateSummary();
@@ -442,6 +446,11 @@ function render() {
 function stateName(fips) {
   const s = statesByFips.get(fips);
   return s ? s.abbr : fips;
+}
+
+function stateFullName(fips) {
+  const s = statesByFips.get(fips);
+  return s ? s.name : fips;
 }
 
 function renderBreadcrumb() {
@@ -553,13 +562,7 @@ function renderMap() {
       .data(nationGeo.features)
       .join("path")
       .attr("d", path)
-      .on("click", (event, d) => {
-        state.view = "state";
-        state.stateFips = d.id.slice(0, 2);
-        state.countyFips = null;
-        pushHash();
-        render();
-      });
+      .on("click", (event, d) => selectCounty(d.id));
     countyPathSel.append("title");
 
     svg
@@ -738,20 +741,20 @@ function renderSummaryStatCards(el, rows, avgLabel, totalCount) {
 }
 
 function renderStateSummary() {
-  document.getElementById("state-summary-title").textContent = stateName(state.stateFips) + " overview";
+  document.getElementById("overview-title").textContent = stateName(state.stateFips) + " overview";
   const rows = countyStatsRows((c) => c.fips.slice(0, 2) === state.stateFips);
   // Total counties in this state per the map (every real county), not per
   // Zillow's list - Zillow doesn't cover every county (e.g. Jackson County,
   // CO), so using data.counties.length as the denominator understated the
   // true gap and could read as "100% coverage" when it wasn't.
   const totalCount = nationGeo.features.filter((f) => f.id.slice(0, 2) === state.stateFips).length;
-  renderSummaryStatCards(document.getElementById("state-summary-stats"), rows, "State average", totalCount);
+  renderSummaryStatCards(document.getElementById("overview-stats"), rows, "State average", totalCount);
 }
 
 function renderNationalSummary() {
-  document.getElementById("national-summary-title").textContent = "United States overview";
+  document.getElementById("overview-title").textContent = "United States overview";
   const rows = countyStatsRows(() => true);
-  renderSummaryStatCards(document.getElementById("national-summary-stats"), rows, "National average", nationGeo.features.length);
+  renderSummaryStatCards(document.getElementById("overview-stats"), rows, "National average", nationGeo.features.length);
 }
 
 function maxBy(arr, key) {
@@ -804,49 +807,50 @@ function addStatCard(container, title, items) {
 
 // ---------- detail inset (dual-line chart: zhvi + income, real values) ----------
 
+const PRICE_COLOR = "#2b6cb0";
+const INCOME_COLOR = "#d69e2e";
+const RATIO_COLOR = "#2c7a7b";
+
+// x scale shared by all three mini-charts (same domain/range for all three,
+// since they're drawn at the same width with the same margins) - stashed so
+// renderDetailMarker() can move each chart's marker line without redoing
+// the whole layout on every month change.
+let detailXScale = null;
+
 function renderDetail() {
   const { name, state: st } = countyDisplayInfo(state.countyFips);
   document.getElementById("detail-title").textContent = `${name}, ${st}`;
 
   const entry = byFips.get(state.countyFips);
   const noDataEl = document.getElementById("detail-no-data");
-  const svgEl = document.getElementById("detail-svg");
+  const chartsEl = document.getElementById("detail-charts");
   const legendEl = document.getElementById("detail-legend");
   if (!entry) {
     // Zillow doesn't cover every county (e.g. Jackson County, CO) - say so
-    // plainly instead of leaving the chart blank or showing a stale
+    // plainly instead of leaving the charts blank or showing a stale
     // previous county's data.
-    //
-    // Note: <svg> is an SVGElement, not an HTMLElement - setting .hidden
-    // on it does NOT reflect to the "hidden" content attribute the way it
-    // does for ordinary elements, so our CSS [hidden] rule never matches
-    // and the element stays visible. Use setAttribute/removeAttribute
-    // directly instead, which works for both.
     noDataEl.hidden = false;
-    svgEl.setAttribute("hidden", "");
-    svgEl._x = null; // clear any stashed scale from a previously-selected real county
+    chartsEl.hidden = true;
+    detailXScale = null;
     legendEl.hidden = true;
     return;
   }
   noDataEl.hidden = true;
-  svgEl.removeAttribute("hidden");
+  chartsEl.hidden = false;
   legendEl.hidden = false;
-
-  const svg = d3.select("#detail-svg");
-  svg.selectAll("*").remove();
-  const bounds = svg.node().getBoundingClientRect();
-  const width = bounds.width || 340;
-  const height = bounds.height || 260;
-  const margin = { top: 10, right: 46, bottom: 24, left: 54 };
-  svg.attr("viewBox", `0 0 ${width} ${height}`);
 
   const months = data.months;
   const zhviSeries = months.map((m, i) => data.zhvi[entry.index][i]);
   const incomeSeries = months.map((m, i) => data.income[entry.index][i]);
+  const ratioSeries = months.map((m, i) =>
+    zhviSeries[i] != null && incomeSeries[i] != null ? zhviSeries[i] / incomeSeries[i] : null
+  );
 
   // Years extrapolated from a QCEW growth rate rather than a real published
-  // FRED figure - flagged so the chart doesn't present an estimate as if it
+  // FRED figure - flagged so the charts don't present an estimate as if it
   // were identical to real data (see build_income.py / web_data_build.py).
+  // The ratio inherits the same flag wherever it depends on an estimated
+  // income figure.
   const estimatedYears = new Set(data.incomeEstimatedYears[state.countyFips] || []);
   const isEstimated = (i) => estimatedYears.has(+months[i].slice(0, 4));
   let lastRealIndex = -1;
@@ -854,122 +858,156 @@ function renderDetail() {
     if (incomeSeries[i] != null && !isEstimated(i)) lastRealIndex = i;
   }
 
-  const x = d3
-    .scaleLinear()
-    .domain([0, months.length - 1])
-    .range([margin.left, width - margin.right]);
+  // All three charts share this width/margin, so one x scale (stashed in
+  // detailXScale) positions every chart's marker line identically.
+  const sampleSvg = document.getElementById("detail-svg-price");
+  const width = sampleSvg.getBoundingClientRect().width || 340;
+  const margin = { top: 8, right: 54, bottom: 4, left: 54 };
+  const x = d3.scaleLinear().domain([0, months.length - 1]).range([margin.left, width - margin.right]);
+  detailXScale = x;
 
-  const zhviExtent = d3.extent(zhviSeries.filter((v) => v != null));
-  const incomeExtent = d3.extent(incomeSeries.filter((v) => v != null));
+  drawMiniChart("detail-svg-price", {
+    width,
+    margin,
+    x,
+    months,
+    showXAxis: false,
+    yFormat: (d) => "$" + d3.format(".2s")(d),
+    series: [{ values: zhviSeries, color: PRICE_COLOR, dash: false }],
+  });
 
-  const yPrice = d3
-    .scaleLinear()
-    .domain([0, (zhviExtent[1] || 1) * 1.05])
-    .range([height - margin.bottom, margin.top]);
+  drawMiniChart("detail-svg-income", {
+    width,
+    margin,
+    x,
+    months,
+    showXAxis: false,
+    yFormat: (d) => "$" + d3.format(".2s")(d),
+    series: [
+      { values: incomeSeries, color: INCOME_COLOR, dash: true, defined: (i) => incomeSeries[i] != null && !isEstimated(i) },
+      {
+        values: incomeSeries,
+        color: INCOME_COLOR,
+        dash: true,
+        faint: true,
+        // Overlaps the real line's last point so the estimated tail
+        // connects visually instead of leaving a gap.
+        defined: (i) => incomeSeries[i] != null && (isEstimated(i) || i === lastRealIndex),
+      },
+    ],
+  });
 
-  const yIncome = d3
-    .scaleLinear()
-    .domain([0, (incomeExtent[1] || 1) * 1.05])
-    .range([height - margin.bottom, margin.top]);
-
-  const g = svg.append("g");
-
-  g.append("g")
-    .attr("transform", `translate(0,${height - margin.bottom})`)
-    .call(
-      d3
-        .axisBottom(x)
-        .ticks(6)
-        .tickFormat((i) => (months[i] ? months[i].slice(0, 4) : ""))
-    );
-
-  g.append("g")
-    .attr("transform", `translate(${margin.left},0)`)
-    .call(d3.axisLeft(yPrice).ticks(5).tickFormat((d) => "$" + d3.format(".2s")(d)));
-
-  g.append("g")
-    .attr("transform", `translate(${width - margin.right},0)`)
-    .call(d3.axisRight(yIncome).ticks(5).tickFormat((d) => "$" + d3.format(".2s")(d)));
-
-  const priceLine = d3
-    .line()
-    .defined((d, i) => zhviSeries[i] != null)
-    .x((d, i) => x(i))
-    .y((d, i) => yPrice(zhviSeries[i]));
-
-  const incomeLineReal = d3
-    .line()
-    .defined((d, i) => incomeSeries[i] != null && !isEstimated(i))
-    .x((d, i) => x(i))
-    .y((d, i) => yIncome(incomeSeries[i]));
-
-  // Overlaps the real line's last point so the estimated tail connects
-  // visually instead of leaving a gap.
-  const incomeLineEstimated = d3
-    .line()
-    .defined((d, i) => incomeSeries[i] != null && (isEstimated(i) || i === lastRealIndex))
-    .x((d, i) => x(i))
-    .y((d, i) => yIncome(incomeSeries[i]));
-
-  g.append("path")
-    .datum(months)
-    .attr("fill", "none")
-    .attr("stroke", "#2b6cb0")
-    .attr("stroke-width", 1.6)
-    .attr("d", priceLine);
-
-  g.append("path")
-    .datum(months)
-    .attr("fill", "none")
-    .attr("stroke", "#d69e2e")
-    .attr("stroke-width", 1.6)
-    .attr("stroke-dasharray", "4,2")
-    .attr("d", incomeLineReal);
-
-  g.append("path")
-    .datum(months)
-    .attr("fill", "none")
-    .attr("stroke", "#d69e2e")
-    .attr("stroke-width", 1.6)
-    .attr("stroke-opacity", 0.55)
-    .attr("stroke-dasharray", "1,2")
-    .attr("d", incomeLineEstimated);
-
-  g.append("line")
-    .attr("id", "detail-marker")
-    .attr("y1", margin.top)
-    .attr("y2", height - margin.bottom)
-    .attr("stroke", "#999")
-    .attr("stroke-width", 1)
-    .attr("stroke-dasharray", "2,2");
-
-  svg.node()._x = x; // stash scale for the marker updater
+  drawMiniChart("detail-svg-ratio", {
+    width,
+    // Only margin.left/right need to match the other charts (that's what
+    // keeps the shared x scale aligned) - bottom can be taller here to fit
+    // this chart's tick labels, since it's the only one showing them.
+    margin: { ...margin, bottom: 20 },
+    x,
+    months,
+    showXAxis: true,
+    yFormat: (d) => d3.format(".1f")(d) + "x",
+    series: [
+      { values: ratioSeries, color: RATIO_COLOR, dash: false, defined: (i) => ratioSeries[i] != null && !isEstimated(i) },
+      {
+        values: ratioSeries,
+        color: RATIO_COLOR,
+        dash: false,
+        faint: true,
+        defined: (i) => ratioSeries[i] != null && (isEstimated(i) || i === lastRealIndex),
+      },
+    ],
+  });
 
   renderDetailMarker();
   renderDetailLegend(estimatedYears.size > 0);
 }
 
+// Draws one of the three stacked mini-charts: a single y-axis, one or more
+// line series (each independently defined, for the real/estimated split),
+// and a marker line for the currently-selected month. Pulled out into a
+// helper because the three charts are otherwise identical apart from which
+// series they plot - only the y-axis format and line styling differ.
+function drawMiniChart(svgId, { width, margin, x, months, showXAxis, yFormat, series }) {
+  const svg = d3.select("#" + svgId);
+  svg.selectAll("*").remove();
+  const bounds = svg.node().getBoundingClientRect();
+  const height = bounds.height || 120;
+  svg.attr("viewBox", `0 0 ${width} ${height}`);
+
+  const allValues = series.flatMap((s) => s.values.filter((v) => v != null));
+  const maxValue = d3.max(allValues) || 1;
+  const y = d3.scaleLinear().domain([0, maxValue * 1.05]).range([height - margin.bottom, margin.top]);
+
+  const g = svg.append("g");
+
+  if (showXAxis) {
+    g.append("g")
+      .attr("transform", `translate(0,${height - margin.bottom})`)
+      .call(
+        d3
+          .axisBottom(x)
+          .ticks(6)
+          .tickFormat((i) => (months[i] ? months[i].slice(0, 4) : ""))
+      );
+  }
+
+  g.append("g")
+    .attr("transform", `translate(${margin.left},0)`)
+    .call(d3.axisLeft(y).ticks(4).tickFormat(yFormat));
+
+  // Duplicated on the right, not just the left - these charts are wide
+  // enough that following a line across to read its value meant losing
+  // track of the y-axis back on the left edge.
+  g.append("g")
+    .attr("transform", `translate(${width - margin.right},0)`)
+    .call(d3.axisRight(y).ticks(4).tickFormat(yFormat));
+
+  series.forEach((s) => {
+    const line = d3
+      .line()
+      .defined((d, i) => (s.defined ? s.defined(i) : s.values[i] != null))
+      .x((d, i) => x(i))
+      .y((d, i) => y(s.values[i]));
+    g.append("path")
+      .datum(months)
+      .attr("fill", "none")
+      .attr("stroke", s.color)
+      .attr("stroke-width", 1.6)
+      .attr("stroke-opacity", s.faint ? 0.55 : 1)
+      .attr("stroke-dasharray", s.dash ? (s.faint ? "1,2" : "4,2") : null)
+      .attr("d", line);
+  });
+
+  g.append("line")
+    .attr("class", "detail-marker")
+    .attr("y1", margin.top)
+    .attr("y2", height - margin.bottom)
+    .attr("stroke", "#999")
+    .attr("stroke-width", 1)
+    .attr("stroke-dasharray", "2,2");
+}
+
 function renderDetailMarker() {
-  const svg = document.getElementById("detail-svg");
-  if (!svg || !svg._x || state.view !== "state" || !state.countyFips) return;
-  const x = svg._x(state.monthIndex);
-  const marker = d3.select("#detail-marker");
-  if (!marker.empty()) marker.attr("x1", x).attr("x2", x);
+  if (!detailXScale || state.view !== "state" || !state.countyFips) return;
+  const xPos = detailXScale(state.monthIndex);
+  d3.selectAll(".detail-marker").attr("x1", xPos).attr("x2", xPos);
 }
 
 function renderDetailLegend(hasEstimatedYears) {
   const el = document.getElementById("detail-legend");
   el.innerHTML = "";
   const rows = [
-    { color: "#2b6cb0", dash: false, label: "Home value (ZHVI, $)" },
-    { color: "#d69e2e", dash: true, label: "Per-capita income ($/yr)" },
+    { color: PRICE_COLOR, dash: false, label: "Home value (ZHVI, $)" },
+    { color: INCOME_COLOR, dash: true, label: "Per-capita income ($/yr)" },
+    { color: RATIO_COLOR, dash: false, label: "Price / income ratio" },
   ];
   if (hasEstimatedYears) {
     rows.push({
-      color: "#d69e2e",
+      color: INCOME_COLOR,
       dash: true,
       faint: true,
-      label: "Income, estimated (no published figure yet)",
+      label: "Income & ratio, estimated (no published income figure yet)",
     });
   }
   rows.forEach((r) => {

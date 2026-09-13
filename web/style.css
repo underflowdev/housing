@@ -264,18 +264,8 @@ body {
   line-height: 1.4;
 }
 
-.sources-legend ul {
+.sources-legend p {
   margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.sources-legend li {
-  margin-bottom: 0.3rem;
-}
-
-.sources-legend li:last-child {
-  margin-bottom: 0;
 }
 
 .sources-legend a {

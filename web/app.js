@@ -862,7 +862,7 @@ function renderDetail() {
   // detailXScale) positions every chart's marker line identically.
   const sampleSvg = document.getElementById("detail-svg-price");
   const width = sampleSvg.getBoundingClientRect().width || 340;
-  const margin = { top: 8, right: 14, bottom: 4, left: 54 };
+  const margin = { top: 8, right: 54, bottom: 4, left: 54 };
   const x = d3.scaleLinear().domain([0, months.length - 1]).range([margin.left, width - margin.right]);
   detailXScale = x;
 
@@ -955,6 +955,13 @@ function drawMiniChart(svgId, { width, margin, x, months, showXAxis, yFormat, se
   g.append("g")
     .attr("transform", `translate(${margin.left},0)`)
     .call(d3.axisLeft(y).ticks(4).tickFormat(yFormat));
+
+  // Duplicated on the right, not just the left - these charts are wide
+  // enough that following a line across to read its value meant losing
+  // track of the y-axis back on the left edge.
+  g.append("g")
+    .attr("transform", `translate(${width - margin.right},0)`)
+    .call(d3.axisRight(y).ticks(4).tickFormat(yFormat));
 
   series.forEach((s) => {
     const line = d3

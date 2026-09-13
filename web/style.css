@@ -349,12 +349,6 @@ body {
   display: inline-block;
 }
 
-#detail-divider {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 1rem 0;
-}
-
 .hint {
   font-size: 0.8rem;
   color: var(--text-muted);
@@ -408,11 +402,37 @@ body {
 
 #timeline-panel {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 0.6rem;
   padding: 0.6rem 1.25rem;
   border-top: 1px solid var(--border);
   background: var(--panel-bg);
+  max-height: 45vh;
+  overflow-y: auto;
+}
+
+#timeline-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* The ratio legend, overview stats, and data sources - previously
+   floating over the map in every view, now living here instead so the
+   map (wider than it is tall, especially at the national level) gets
+   the full width of #app-main to itself in both views. Wraps to a
+   narrower/taller stack on a narrow screen rather than the boxes ever
+   overlapping each other or the map. */
+#info-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+
+#info-row .legend {
+  flex: 1 1 220px;
+  margin: 0;
 }
 
 #play-toggle {
@@ -460,27 +480,29 @@ body {
 
 [hidden] { display: none !important; }
 
-/* #detail-panel (380px, fixed) is a permanent side panel in both views
-   now, plus #county-list-panel (240px, fixed) in state view - together
-   they can leave the map a sliver or nothing at all below ~920px
-   (min-width: 0 lets its flex-basis go to zero). Stack everything into
-   one scrollable column instead, with the map given a real height of its
-   own and reordered first so it's the first thing visible. Safe to do
-   unconditionally in both views now - neither has a floating overlay left
-   that could spill out of a shortened map anymore, since the ratio
-   legend/overview/data sources all live in #detail-panel's normal flow. */
+/* Nation view is just the map now - no side panel competing with it for
+   width at all, in any screen size, since the ratio legend/overview/data
+   sources all moved to the footer's #info-row. State view still has
+   #county-list-panel (240px, fixed) + #detail-panel (380px, fixed)
+   though, which together can leave the map a sliver or nothing below
+   ~920px (min-width: 0 lets its flex-basis go to zero) - stack those into
+   one scrollable column instead, map first with a real height of its own.
+   Scoped (via :has) to when #detail-panel is actually visible - i.e.
+   state view - so nation view's map keeps using the full #app-main
+   height at every width instead of leaving unused space below a
+   height-capped map with nothing else there to fill it. */
 @media (max-width: 920px) {
   #app-header {
     flex-wrap: wrap;
     row-gap: 0.15rem;
   }
 
-  #app-main {
+  #app-main:has(#detail-panel:not([hidden])) {
     flex-direction: column;
     overflow-y: auto;
   }
 
-  #county-list-panel {
+  #app-main:has(#detail-panel:not([hidden])) #county-list-panel {
     order: 2;
     width: 100%;
     max-height: 200px;
@@ -488,7 +510,7 @@ body {
     border-bottom: 1px solid var(--border);
   }
 
-  #map-panel {
+  #app-main:has(#detail-panel:not([hidden])) #map-panel {
     order: 1;
     flex: none;
     width: 100%;
@@ -496,10 +518,14 @@ body {
     min-height: 260px;
   }
 
-  #detail-panel {
+  #app-main:has(#detail-panel:not([hidden])) #detail-panel {
     order: 3;
     width: 100%;
     border-left: none;
     border-top: 1px solid var(--border);
+  }
+
+  #info-row .legend {
+    flex-basis: 100%;
   }
 }

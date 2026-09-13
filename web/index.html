@@ -25,7 +25,7 @@
     <svg id="map-svg"></svg>
   </section>
 
-  <section id="detail-panel">
+  <section id="detail-panel" hidden>
     <div id="county-detail" hidden>
       <h2 id="detail-title"></h2>
       <p id="detail-no-data" class="hint" hidden>No home value or income data is available for this county.</p>
@@ -45,8 +45,21 @@
       </div>
       <div id="detail-legend" class="legend chart-legend"></div>
     </div>
-    <hr id="detail-divider" hidden />
+    <p id="detail-empty-hint" class="hint">Click a county to see its full history.</p>
+  </section>
+</main>
 
+<footer id="timeline-panel">
+  <div id="timeline-row">
+    <button id="play-toggle" aria-label="Play">▶</button>
+    <span id="timeline-label"></span>
+    <div id="timeline-track">
+      <input id="timeline-slider" type="range" min="0" value="0" step="1" />
+      <svg id="timeline-scale"></svg>
+    </div>
+  </div>
+
+  <div id="info-row">
     <div id="map-legend" class="legend collapsible">
       <button class="legend-collapse-toggle" type="button" aria-label="Collapse">−</button>
       <div id="legend-title" class="legend-title">Price / Income ratio</div>
@@ -65,9 +78,9 @@
       <div id="national-summary-stats"></div>
     </div>
 
-    <div id="state-summary">
-      <h2 id="state-summary-title"></h2>
-      <p id="state-summary-hint" class="hint">Click a county to see its full history.</p>
+    <div id="state-summary" class="legend stats-legend collapsible" hidden>
+      <button class="legend-collapse-toggle" type="button" aria-label="Collapse">−</button>
+      <div id="state-summary-title" class="legend-title"></div>
       <div id="state-summary-stats"></div>
     </div>
 
@@ -83,15 +96,6 @@
         <li>Source code: <a href="https://github.com/underflowdev/housing" target="_blank" rel="noopener noreferrer">GitHub</a></li>
       </ul>
     </div>
-  </section>
-</main>
-
-<footer id="timeline-panel">
-  <button id="play-toggle" aria-label="Play">▶</button>
-  <span id="timeline-label"></span>
-  <div id="timeline-track">
-    <input id="timeline-slider" type="range" min="0" value="0" step="1" />
-    <svg id="timeline-scale"></svg>
   </div>
 </footer>
 

@@ -409,19 +409,19 @@ function render() {
   }
 
   const listPanel = document.getElementById("county-list-panel");
+  const detailPanel = document.getElementById("detail-panel");
   const countyDetailEl = document.getElementById("county-detail");
   const nationalSummaryEl = document.getElementById("national-summary");
   const stateSummaryEl = document.getElementById("state-summary");
 
-  // #detail-panel is a permanent side panel in both views now (see
-  // index.html) - it holds the price/income ratio legend and data sources
-  // in both, plus either the national or the state overview. Keeping them
-  // in the document flow instead of floating over the map is what avoids
-  // them crowding/overlapping a small map on a narrow screen.
+  // The ratio legend, overview stats, and data sources live in the
+  // footer's #info-row in both views now (see index.html) - always
+  // visible there, out of the map's way entirely, rather than floating
+  // over it or sharing width with it in a side panel. #detail-panel is
+  // now just the per-county charts, so it only exists in state view.
   if (state.view === "nation") {
     listPanel.hidden = true;
-    countyDetailEl.hidden = true;
-    document.getElementById("detail-divider").hidden = true;
+    detailPanel.hidden = true;
     stateSummaryEl.hidden = true;
     nationalSummaryEl.hidden = false;
     document.getElementById("crumb-title").textContent = "United States";
@@ -433,15 +433,13 @@ function render() {
     stateSummaryEl.hidden = false;
     document.getElementById("nation-hint").hidden = true;
     listPanel.hidden = false;
+    detailPanel.hidden = false;
     document.getElementById("crumb-title").textContent = stateFullName(state.stateFips);
     renderCountyList("");
     renderMap();
 
-    // The state summary stays visible even with a county selected, per
-    // request - the divider and hint text just delineate the two sections.
     const hasCounty = !!state.countyFips;
-    document.getElementById("detail-divider").hidden = !hasCounty;
-    document.getElementById("state-summary-hint").hidden = hasCounty;
+    document.getElementById("detail-empty-hint").hidden = hasCounty;
     countyDetailEl.hidden = !hasCounty;
     if (hasCounty) renderDetail();
     renderStateSummary();

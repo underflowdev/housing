@@ -398,7 +398,6 @@ function render() {
   document.getElementById("timeline-slider").value = state.monthIndex;
   updateTimelineLabel();
   renderBreadcrumb();
-  relocateLegends();
 
   // The state color-scale toggle is per-state, transient UI state - reset
   // to the national scale whenever landing on a different state (or
@@ -410,22 +409,30 @@ function render() {
   }
 
   const listPanel = document.getElementById("county-list-panel");
-  const detailPanel = document.getElementById("detail-panel");
   const countyDetailEl = document.getElementById("county-detail");
+  const nationalSummaryEl = document.getElementById("national-summary");
+  const stateSummaryEl = document.getElementById("state-summary");
 
+  // #detail-panel is a permanent side panel in both views now (see
+  // index.html) - it holds the price/income ratio legend and data sources
+  // in both, plus either the national or the state overview. Keeping them
+  // in the document flow instead of floating over the map is what avoids
+  // them crowding/overlapping a small map on a narrow screen.
   if (state.view === "nation") {
     listPanel.hidden = true;
-    detailPanel.hidden = true;
+    countyDetailEl.hidden = true;
+    document.getElementById("detail-divider").hidden = true;
+    stateSummaryEl.hidden = true;
+    nationalSummaryEl.hidden = false;
     document.getElementById("crumb-title").textContent = "United States";
-    document.getElementById("national-summary").hidden = false;
     document.getElementById("nation-hint").hidden = false;
     renderMap();
     renderNationalSummary();
   } else {
-    document.getElementById("national-summary").hidden = true;
+    nationalSummaryEl.hidden = true;
+    stateSummaryEl.hidden = false;
     document.getElementById("nation-hint").hidden = true;
     listPanel.hidden = false;
-    detailPanel.hidden = false;
     document.getElementById("crumb-title").textContent = stateFullName(state.stateFips);
     renderCountyList("");
     renderMap();
@@ -438,29 +445,6 @@ function render() {
     countyDetailEl.hidden = !hasCounty;
     if (hasCounty) renderDetail();
     renderStateSummary();
-  }
-}
-
-// The price/income ratio legend and data sources box normally float over
-// the map (nation view). In state view they instead move into the side
-// panel's document flow - the ratio legend under the county charts (if
-// any) and over the state overview, data sources under the state overview
-// - since the map there is a state-relative color scale that's much less
-// in need of an always-visible floating legend, and the extra floating
-// boxes just crowd the (usually much smaller) state map. Reparenting the
-// same elements rather than duplicating them keeps their click handlers
-// (the color-scale toggle) and collapse state working unchanged.
-function relocateLegends() {
-  const mapLegend = document.getElementById("map-legend");
-  const sourcesLegend = document.getElementById("sources-legend");
-  if (state.view === "state") {
-    const detailPanel = document.getElementById("detail-panel");
-    const stateSummary = document.getElementById("state-summary");
-    detailPanel.insertBefore(mapLegend, stateSummary);
-    detailPanel.appendChild(sourcesLegend);
-  } else {
-    document.getElementById("map-overlay").appendChild(mapLegend);
-    document.getElementById("map-panel").appendChild(sourcesLegend);
   }
 }
 

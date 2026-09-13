@@ -23,39 +23,9 @@
 
   <section id="map-panel">
     <svg id="map-svg"></svg>
-    <div id="map-overlay">
-      <div id="national-summary" class="legend stats-legend collapsible" hidden>
-        <button class="legend-collapse-toggle" type="button" aria-label="Collapse">−</button>
-        <div id="national-summary-title" class="legend-title"></div>
-        <div id="national-summary-stats"></div>
-      </div>
-      <div id="map-legend" class="legend collapsible">
-        <button class="legend-collapse-toggle" type="button" aria-label="Collapse">−</button>
-        <div id="legend-title" class="legend-title">Price / Income ratio</div>
-        <svg id="legend-swatch" height="14"></svg>
-        <div class="legend-labels">
-          <span id="legend-min"></span>
-          <span id="legend-max"></span>
-        </div>
-        <div class="legend-note">Gray = no data available</div>
-        <div id="legend-toggle-hint" class="legend-note" hidden></div>
-      </div>
-    </div>
-    <div id="sources-legend" class="legend sources-legend collapsible">
-      <button class="legend-collapse-toggle" type="button" aria-label="Collapse">−</button>
-      <div class="legend-title">Data sources</div>
-      <ul>
-        <li>Home values: <a href="https://www.zillow.com/research/data/" target="_blank" rel="noopener noreferrer">Data Provided by Zillow Group</a></li>
-        <li>Income (historical): <a href="https://fred.stlouisfed.org/" target="_blank" rel="noopener noreferrer">U.S. BEA via FRED</a>, Federal Reserve Bank of St. Louis</li>
-        <li>Income (recent-year estimate): <a href="https://www.bls.gov/cew/" target="_blank" rel="noopener noreferrer">U.S. Bureau of Labor Statistics, QCEW</a></li>
-        <li>County boundaries: <a href="https://github.com/topojson/us-atlas" target="_blank" rel="noopener noreferrer">us-atlas</a> (US Census Bureau TIGER/Line)</li>
-        <li>Hosted at: <a href="https://underflow.dev/housing" target="_blank" rel="noopener noreferrer">underflow.dev/housing</a></li>
-        <li>Source code: <a href="https://github.com/underflowdev/housing" target="_blank" rel="noopener noreferrer">GitHub</a></li>
-      </ul>
-    </div>
   </section>
 
-  <section id="detail-panel" hidden>
+  <section id="detail-panel">
     <div id="county-detail" hidden>
       <h2 id="detail-title"></h2>
       <p id="detail-no-data" class="hint" hidden>No home value or income data is available for this county.</p>
@@ -76,10 +46,42 @@
       <div id="detail-legend" class="legend chart-legend"></div>
     </div>
     <hr id="detail-divider" hidden />
+
+    <div id="map-legend" class="legend collapsible">
+      <button class="legend-collapse-toggle" type="button" aria-label="Collapse">−</button>
+      <div id="legend-title" class="legend-title">Price / Income ratio</div>
+      <svg id="legend-swatch" height="14"></svg>
+      <div class="legend-labels">
+        <span id="legend-min"></span>
+        <span id="legend-max"></span>
+      </div>
+      <div class="legend-note">Gray = no data available</div>
+      <div id="legend-toggle-hint" class="legend-note" hidden></div>
+    </div>
+
+    <div id="national-summary" class="legend stats-legend collapsible" hidden>
+      <button class="legend-collapse-toggle" type="button" aria-label="Collapse">−</button>
+      <div id="national-summary-title" class="legend-title"></div>
+      <div id="national-summary-stats"></div>
+    </div>
+
     <div id="state-summary">
       <h2 id="state-summary-title"></h2>
       <p id="state-summary-hint" class="hint">Click a county to see its full history.</p>
       <div id="state-summary-stats"></div>
+    </div>
+
+    <div id="sources-legend" class="legend sources-legend collapsible">
+      <button class="legend-collapse-toggle" type="button" aria-label="Collapse">−</button>
+      <div class="legend-title">Data sources</div>
+      <ul>
+        <li>Home values: <a href="https://www.zillow.com/research/data/" target="_blank" rel="noopener noreferrer">Data Provided by Zillow Group</a></li>
+        <li>Income (historical): <a href="https://fred.stlouisfed.org/" target="_blank" rel="noopener noreferrer">U.S. BEA via FRED</a>, Federal Reserve Bank of St. Louis</li>
+        <li>Income (recent-year estimate): <a href="https://www.bls.gov/cew/" target="_blank" rel="noopener noreferrer">U.S. Bureau of Labor Statistics, QCEW</a></li>
+        <li>County boundaries: <a href="https://github.com/topojson/us-atlas" target="_blank" rel="noopener noreferrer">us-atlas</a> (US Census Bureau TIGER/Line)</li>
+        <li>Hosted at: <a href="https://underflow.dev/housing" target="_blank" rel="noopener noreferrer">underflow.dev/housing</a></li>
+        <li>Source code: <a href="https://github.com/underflowdev/housing" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+      </ul>
     </div>
   </section>
 </main>

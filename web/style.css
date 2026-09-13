@@ -190,15 +190,12 @@ body {
 }
 
 .legend {
-  position: absolute;
-  left: 0.75rem;
-  bottom: 0.75rem;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--panel-bg);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.5rem 0.65rem;
+  margin: 0.75rem 0;
   font-size: 0.75rem;
-  min-width: 160px;
 }
 
 .collapsible {
@@ -246,54 +243,6 @@ body {
   white-space: nowrap;
 }
 
-#map-overlay {
-  position: absolute;
-  left: 0.75rem;
-  bottom: 0.75rem;
-  display: flex;
-  flex-direction: column-reverse;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-
-#map-overlay .legend {
-  position: static;
-}
-
-/* Higher specificity than #map-overlay .legend above, needed so the
-   collapse-toggle button (position: absolute) anchors to this box itself
-   rather than escaping up to the next positioned ancestor (#map-panel) -
-   which two collapsible boxes in the same overlay would otherwise share,
-   landing their toggle buttons on top of each other. */
-#map-overlay .legend.collapsible {
-  position: relative;
-}
-
-/* In state view, #map-legend and #sources-legend are moved (see
-   relocateLegends() in app.js) out of the floating map overlay into the
-   side panel's normal document flow. Needs position: relative (not
-   static) rather than the plain flow #map-overlay's children get - the
-   collapse-toggle button is itself position: absolute and anchors to
-   the nearest positioned ancestor, which needs to stay this box and not
-   escape to #detail-panel (or further) the way #sources-legend's own
-   position: absolute + right/bottom would otherwise take it. Also drops
-   the width caps that made sense floating over a map but not sitting in
-   a 380px-wide panel. */
-#detail-panel .legend {
-  position: relative;
-  right: auto;
-  bottom: auto;
-  left: auto;
-  margin: 0.75rem 0;
-  min-width: 0;
-  max-width: none;
-}
-
-.stats-legend {
-  min-width: 300px;
-  max-width: 340px;
-}
-
 .stats-legend .stat-row {
   flex-wrap: wrap;
   row-gap: 0.1rem;
@@ -319,11 +268,6 @@ body {
 }
 
 .sources-legend {
-  position: absolute;
-  right: 0.75rem;
-  bottom: 0.75rem;
-  left: auto;
-  max-width: 260px;
   font-size: 0.68rem;
   line-height: 1.4;
 }
@@ -516,30 +460,27 @@ body {
 
 [hidden] { display: none !important; }
 
-/* The county list (240px, fixed) + detail panel (380px, fixed) alone add
-   up to 620px, so anything narrower than ~920px leaves the map a sliver
-   or nothing at all (min-width: 0 lets its flex-basis go to zero) - its
-   absolutely-positioned legend overlays are all that's left, floating
-   over the other panels. Stack everything into one scrollable column
-   instead, with the map given a real height of its own and reordered
-   first so it's the first thing visible.
-   Scoped (via :has) to only when the county list panel is actually
-   visible - i.e. state view. Nation view is just the one map panel with
-   nothing competing for width, so it already fills the available height
-   fine on its own; forcing the same fixed height there would only make
-   its own (taller) overlay legend spill out the bottom instead. */
+/* #detail-panel (380px, fixed) is a permanent side panel in both views
+   now, plus #county-list-panel (240px, fixed) in state view - together
+   they can leave the map a sliver or nothing at all below ~920px
+   (min-width: 0 lets its flex-basis go to zero). Stack everything into
+   one scrollable column instead, with the map given a real height of its
+   own and reordered first so it's the first thing visible. Safe to do
+   unconditionally in both views now - neither has a floating overlay left
+   that could spill out of a shortened map anymore, since the ratio
+   legend/overview/data sources all live in #detail-panel's normal flow. */
 @media (max-width: 920px) {
   #app-header {
     flex-wrap: wrap;
     row-gap: 0.15rem;
   }
 
-  #app-main:has(#county-list-panel:not([hidden])) {
+  #app-main {
     flex-direction: column;
     overflow-y: auto;
   }
 
-  #app-main:has(#county-list-panel:not([hidden])) #county-list-panel {
+  #county-list-panel {
     order: 2;
     width: 100%;
     max-height: 200px;
@@ -547,7 +488,7 @@ body {
     border-bottom: 1px solid var(--border);
   }
 
-  #app-main:has(#county-list-panel:not([hidden])) #map-panel {
+  #map-panel {
     order: 1;
     flex: none;
     width: 100%;
@@ -555,7 +496,7 @@ body {
     min-height: 260px;
   }
 
-  #app-main:has(#county-list-panel:not([hidden])) #detail-panel {
+  #detail-panel {
     order: 3;
     width: 100%;
     border-left: none;

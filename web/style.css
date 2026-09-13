@@ -534,4 +534,11 @@ body {
   #info-row #sources-legend {
     flex-basis: 100%;
   }
+
+  /* .stat-card's flex-basis: 200px lets two fit per row around this
+     width, giving an awkward 2x2 grid instead of a clean single-column
+     stack - force full width instead. */
+  #overview-stats .stat-card {
+    flex-basis: 100%;
+  }
 }

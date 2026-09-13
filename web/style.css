@@ -301,10 +301,12 @@ body {
 
 #map-legend.clickable {
   cursor: pointer;
+  border-width: 2px;
+  border-color: var(--accent);
 }
 
 #map-legend.clickable:hover {
-  border-color: var(--accent);
+  background: rgba(43, 108, 176, 0.05);
 }
 
 #legend-toggle-hint {

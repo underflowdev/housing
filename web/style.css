@@ -243,28 +243,20 @@ body {
   white-space: nowrap;
 }
 
-.stats-legend .stat-row {
+#overview-stats .stat-row {
   flex-wrap: wrap;
   row-gap: 0.1rem;
 }
 
-.stats-legend .stat-county {
+#overview-stats .stat-county {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.stats-legend .stat-value {
+#overview-stats .stat-value {
   margin-left: 0.5rem;
-}
-
-.stats-legend .stat-card {
-  margin-bottom: 0.4rem;
-}
-
-.stats-legend .stat-card:last-child {
-  margin-bottom: 0;
 }
 
 .sources-legend {
@@ -355,15 +347,25 @@ body {
   margin: 0 0 0.75rem;
 }
 
-#state-summary-stats {
-  margin: 0;
+#overview-section {
+  margin-bottom: 0.6rem;
+}
+
+/* One card per stat (coverage, home value, income, ratio) instead of one
+   box holding all of them - each is its own flex item here so they can
+   wrap freely, rather than being nested inside a single wrapping box. */
+#overview-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
 }
 
 .stat-card {
+  flex: 1 1 200px;
   border: 1px solid var(--border);
   border-radius: 6px;
+  background: var(--panel-bg);
   padding: 0.5rem 0.65rem;
-  margin-bottom: 0.6rem;
 }
 
 .stat-card-title {
@@ -417,12 +419,15 @@ body {
   gap: 0.75rem;
 }
 
-/* The ratio legend, overview stats, and data sources - previously
-   floating over the map in every view, now living here instead so the
-   map (wider than it is tall, especially at the national level) gets
-   the full width of #app-main to itself in both views. Wraps to a
-   narrower/taller stack on a narrow screen rather than the boxes ever
-   overlapping each other or the map. */
+/* The ratio legend and data sources - previously floating over the map
+   in every view, now living here instead (alongside #overview-section
+   above) so the map (wider than it is tall, especially at the national
+   level) gets the full width of #app-main to itself in both views.
+   Ratio legend is the smaller of the two (a color bar + two numbers)
+   so it gets 1/3 of the row, data sources (a list of links) gets 2/3 -
+   flex-basis 0 with those grow ratios splits any leftover space that
+   way once both fit on one line; below that they wrap to full width,
+   1/3-first, in source order. */
 #info-row {
   display: flex;
   flex-wrap: wrap;
@@ -430,8 +435,15 @@ body {
   align-items: flex-start;
 }
 
+#info-row #map-legend {
+  flex: 1 1 240px;
+}
+
+#info-row #sources-legend {
+  flex: 2 1 320px;
+}
+
 #info-row .legend {
-  flex: 1 1 220px;
   margin: 0;
 }
 
@@ -525,7 +537,11 @@ body {
     border-top: 1px solid var(--border);
   }
 
-  #info-row .legend {
+  /* Same specificity (2 ids) as the #info-row #map-legend/#sources-legend
+     rules above so this actually overrides their flex-basis instead of
+     losing to them regardless of source order. */
+  #info-row #map-legend,
+  #info-row #sources-legend {
     flex-basis: 100%;
   }
 }

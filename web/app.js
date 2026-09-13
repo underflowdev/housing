@@ -411,26 +411,23 @@ function render() {
   const listPanel = document.getElementById("county-list-panel");
   const detailPanel = document.getElementById("detail-panel");
   const countyDetailEl = document.getElementById("county-detail");
-  const nationalSummaryEl = document.getElementById("national-summary");
-  const stateSummaryEl = document.getElementById("state-summary");
 
-  // The ratio legend, overview stats, and data sources live in the
-  // footer's #info-row in both views now (see index.html) - always
-  // visible there, out of the map's way entirely, rather than floating
-  // over it or sharing width with it in a side panel. #detail-panel is
-  // now just the per-county charts, so it only exists in state view.
+  // The overview section and the ratio legend/data sources row live in
+  // the footer in both views now (see index.html) - always visible
+  // there, out of the map's way entirely, rather than floating over it
+  // or sharing width with it in a side panel. #overview-section has a
+  // single title/stats target reused by both renderNationalSummary() and
+  // renderStateSummary() (only one of which ever runs at a time), rather
+  // than two separate boxes toggled by hidden. #detail-panel is now just
+  // the per-county charts, so it only exists in state view.
   if (state.view === "nation") {
     listPanel.hidden = true;
     detailPanel.hidden = true;
-    stateSummaryEl.hidden = true;
-    nationalSummaryEl.hidden = false;
     document.getElementById("crumb-title").textContent = "United States";
     document.getElementById("nation-hint").hidden = false;
     renderMap();
     renderNationalSummary();
   } else {
-    nationalSummaryEl.hidden = true;
-    stateSummaryEl.hidden = false;
     document.getElementById("nation-hint").hidden = true;
     listPanel.hidden = false;
     detailPanel.hidden = false;
@@ -744,20 +741,20 @@ function renderSummaryStatCards(el, rows, avgLabel, totalCount) {
 }
 
 function renderStateSummary() {
-  document.getElementById("state-summary-title").textContent = stateName(state.stateFips) + " overview";
+  document.getElementById("overview-title").textContent = stateName(state.stateFips) + " overview";
   const rows = countyStatsRows((c) => c.fips.slice(0, 2) === state.stateFips);
   // Total counties in this state per the map (every real county), not per
   // Zillow's list - Zillow doesn't cover every county (e.g. Jackson County,
   // CO), so using data.counties.length as the denominator understated the
   // true gap and could read as "100% coverage" when it wasn't.
   const totalCount = nationGeo.features.filter((f) => f.id.slice(0, 2) === state.stateFips).length;
-  renderSummaryStatCards(document.getElementById("state-summary-stats"), rows, "State average", totalCount);
+  renderSummaryStatCards(document.getElementById("overview-stats"), rows, "State average", totalCount);
 }
 
 function renderNationalSummary() {
-  document.getElementById("national-summary-title").textContent = "United States overview";
+  document.getElementById("overview-title").textContent = "United States overview";
   const rows = countyStatsRows(() => true);
-  renderSummaryStatCards(document.getElementById("national-summary-stats"), rows, "National average", nationGeo.features.length);
+  renderSummaryStatCards(document.getElementById("overview-stats"), rows, "National average", nationGeo.features.length);
 }
 
 function maxBy(arr, key) {

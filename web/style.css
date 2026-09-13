@@ -495,3 +495,50 @@ body {
 }
 
 [hidden] { display: none !important; }
+
+/* The county list (240px, fixed) + detail panel (380px, fixed) alone add
+   up to 620px, so anything narrower than ~920px leaves the map a sliver
+   or nothing at all (min-width: 0 lets its flex-basis go to zero) - its
+   absolutely-positioned legend overlays are all that's left, floating
+   over the other panels. Stack everything into one scrollable column
+   instead, with the map given a real height of its own and reordered
+   first so it's the first thing visible.
+   Scoped (via :has) to only when the county list panel is actually
+   visible - i.e. state view. Nation view is just the one map panel with
+   nothing competing for width, so it already fills the available height
+   fine on its own; forcing the same fixed height there would only make
+   its own (taller) overlay legend spill out the bottom instead. */
+@media (max-width: 920px) {
+  #app-header {
+    flex-wrap: wrap;
+    row-gap: 0.15rem;
+  }
+
+  #app-main:has(#county-list-panel:not([hidden])) {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  #app-main:has(#county-list-panel:not([hidden])) #county-list-panel {
+    order: 2;
+    width: 100%;
+    max-height: 200px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  #app-main:has(#county-list-panel:not([hidden])) #map-panel {
+    order: 1;
+    flex: none;
+    width: 100%;
+    height: 55vh;
+    min-height: 260px;
+  }
+
+  #app-main:has(#county-list-panel:not([hidden])) #detail-panel {
+    order: 3;
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+}

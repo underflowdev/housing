@@ -8,7 +8,6 @@
   --accent: #2b6cb0;
   --accent-solid: #2b6cb0;
   --no-data: #c9c9c5;
-  --accent-tint: rgba(43, 108, 176, 0.08);
   --map-stroke: #ffffff;
   --map-highlight-stroke: #1f1f1f;
   --state-fill: #dfe6ee;
@@ -29,7 +28,6 @@
     --accent: #6fa8dc;
     --accent-solid: #3a7cbf;
     --no-data: #3a3b3e;
-    --accent-tint: rgba(111, 168, 220, 0.12);
     --map-stroke: #17181a;
     --map-highlight-stroke: #f2f2f0;
     --state-fill: #2a3540;
@@ -319,12 +317,19 @@ body {
   margin-bottom: 0.3rem;
 }
 
+#toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
 .metric-toggle {
   display: inline-flex;
   border: 1px solid var(--border);
   border-radius: 5px;
   overflow: hidden;
-  margin-bottom: 0.5rem;
 }
 
 .metric-btn {
@@ -361,20 +366,6 @@ body {
 .legend-note {
   margin-top: 0.35rem;
   color: var(--text-muted);
-}
-
-#map-legend.clickable {
-  cursor: pointer;
-  border-width: 2px;
-  border-color: var(--accent);
-}
-
-#map-legend.clickable:hover {
-  background: var(--accent-tint);
-}
-
-#legend-toggle-hint {
-  font-style: italic;
 }
 
 .chart-legend {

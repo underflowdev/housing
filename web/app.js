@@ -245,21 +245,16 @@ function renderLegendSwatch() {
 
   document.getElementById("legend-scale-note").hidden = state.metric === "ratio";
 
-  const legendEl = document.getElementById("map-legend");
-  legendEl.classList.toggle("clickable", state.view === "state");
-
-  const toggleHint = document.getElementById("legend-toggle-hint");
-  toggleHint.hidden = state.view !== "state";
-  if (state.view === "state") {
-    toggleHint.textContent = isStateScale
-      ? "Colored by this state's own range — click for national scale"
-      : "Colored by the national range — click for this state's own scale";
-  }
+  const scaleToggle = document.getElementById("scale-toggle");
+  scaleToggle.hidden = state.view !== "state";
+  scaleToggle.querySelectorAll(".metric-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.scale === state.colorMode);
+  });
 }
 
-function toggleColorMode() {
-  if (state.view !== "state") return;
-  state.colorMode = state.colorMode === "state" ? "national" : "state";
+function setColorMode(mode) {
+  if (state.view !== "state" || state.colorMode === mode) return;
+  state.colorMode = mode;
   renderLegendSwatch();
   updateMapColors();
 }
@@ -267,7 +262,7 @@ function toggleColorMode() {
 function setMetric(metric) {
   if (state.metric === metric) return;
   state.metric = metric;
-  document.querySelectorAll(".metric-btn").forEach((btn) => {
+  document.querySelectorAll("#metric-toggle .metric-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.metric === metric);
   });
   renderLegendSwatch();
@@ -324,15 +319,12 @@ function wireControls() {
     renderCountyList(e.target.value.trim().toLowerCase());
   });
 
-  document.getElementById("map-legend").addEventListener("click", toggleColorMode);
+  document.querySelectorAll("#metric-toggle .metric-btn").forEach((btn) => {
+    btn.addEventListener("click", () => setMetric(btn.dataset.metric));
+  });
 
-  document.querySelectorAll(".metric-btn").forEach((btn) => {
-    btn.addEventListener("click", (event) => {
-      // #map-legend itself has a click handler (state-scale toggle) - don't
-      // let that also fire when the user meant to switch metrics.
-      event.stopPropagation();
-      setMetric(btn.dataset.metric);
-    });
+  document.querySelectorAll("#scale-toggle .metric-btn").forEach((btn) => {
+    btn.addEventListener("click", () => setColorMode(btn.dataset.scale));
   });
 
   wireCollapsibleLegends();

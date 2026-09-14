@@ -2,8 +2,8 @@
 # Deploy to S3. Configure scripts/deploy.env (see deploy.env.example).
 #
 # Shares one S3 bucket + CloudFront distribution with the peer sun_overlay
-# and cu_salary projects, each under its own PREFIX (BUCKET is the
-# underflow.dev bucket itself - same convention as their scripts/deploy.sh).
+# and cu_salary projects, each under its own PREFIX - same convention as
+# their scripts/deploy.sh.
 #
 # web/ is the entire deployable unit (see CLAUDE.md) - including web/data/,
 # which must be freshly built before deploying:

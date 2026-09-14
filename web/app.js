@@ -9,7 +9,7 @@ const state = {
   countyFips: null,     // 5-digit, selected for the detail inset
   monthIndex: 0,
   colorMode: "national", // 'national' | 'state' - state view only; nation view is always national
-  metric: "ratio",       // 'ratio' | 'price' - what the choropleth and its legend show
+  metric: "ratio",       // 'ratio' | 'price' | 'income' - what the choropleth and its legend show
 };
 
 let data = null;        // { months, counties, zhvi, income }
@@ -19,8 +19,16 @@ let stateGeo = null;    // GeoJSON FeatureCollection, all states
 let byFips = new Map(); // fips -> { county, index, geo } - only counties Zillow covers
 let countyNameByFips = new Map(); // fips -> {name, state} - every county in the map, including ones Zillow doesn't cover
 let statesByFips = new Map(); // 2-digit fips -> { abbr, geo }
-let colorScales = { ratio: null, price: null }; // fixed national color scale per metric - the main map always uses these
-let stateColorScaleCache = new Map(); // "metric:stateFips" -> its own color scale, built on first use
+// Ratio is inherently a relative measure, so its scale is fixed once
+// (computed across all counties/months) and stays comparable at every point
+// on the timeline. Price and income are nominal dollar figures that trend
+// up over the ~25yr range (appreciation/inflation), so a scale fixed like
+// ratio's would leave early months uniformly dim and late months uniformly
+// bright - those get a month-relative scale instead (see
+// monthColorScaleCache below).
+let ratioColorScale = null;
+let stateColorScaleCache = new Map(); // "metric:stateFips" -> ratio's own per-state color scale, built on first use
+let monthColorScaleCache = new Map(); // "metric:scope:monthIndex" -> price/income's per-month color scale, built on first use
 let countyPathSel = null; // d3 selection of the currently-drawn county <path> elements
 let colorModeStateFips = null; // which state colorMode currently applies to (reset on state change)
 
@@ -62,8 +70,7 @@ Promise.all([
     }
   });
 
-  colorScales.ratio = buildColorScale("ratio");
-  colorScales.price = buildColorScale("price");
+  ratioColorScale = buildColorScale("ratio");
 
   const slider = document.getElementById("timeline-slider");
   slider.max = data.months.length - 1;
@@ -99,9 +106,17 @@ function zhviFor(fips, monthIndex) {
   return data.zhvi[entry.index][monthIndex];
 }
 
+function incomeFor(fips, monthIndex) {
+  const entry = byFips.get(fips);
+  if (!entry) return null;
+  return data.income[entry.index][monthIndex];
+}
+
 // The value the choropleth colors by, for whichever metric is selected.
 function valueFor(fips, monthIndex, metric) {
-  return metric === "price" ? zhviFor(fips, monthIndex) : ratioFor(fips, monthIndex);
+  if (metric === "price") return zhviFor(fips, monthIndex);
+  if (metric === "income") return incomeFor(fips, monthIndex);
+  return ratioFor(fips, monthIndex);
 }
 
 function latestMonthWithIncomeData() {
@@ -142,28 +157,55 @@ function buildColorScale(metric) {
 
 // A state's own counties can have far less spread than the whole country,
 // so the fixed national scale can leave a low-variation state (e.g. Kansas)
-// looking nearly uniform. This builds (and caches, per metric) a scale from
+// looking nearly uniform. This builds (and caches) ratio's own scale from
 // just that state's own counties, in a visually distinct color scheme so
 // it's never mistaken for the national one.
-function getStateColorScale(metric, stateFips) {
-  const key = metric + ":" + stateFips;
-  if (!stateColorScaleCache.has(key)) {
-    const samples = sampleValues((c) => c.fips.slice(0, 2) === stateFips, metric);
-    stateColorScaleCache.set(key, scaleFromSamples(samples, d3.interpolateOranges));
+function getStateRatioColorScale(stateFips) {
+  if (!stateColorScaleCache.has(stateFips)) {
+    const samples = sampleValues((c) => c.fips.slice(0, 2) === stateFips, "ratio");
+    stateColorScaleCache.set(stateFips, scaleFromSamples(samples, d3.interpolateOranges));
   }
-  return stateColorScaleCache.get(key);
+  return stateColorScaleCache.get(stateFips);
 }
 
-// The scale actually used to color the map right now: the state view's own
-// scale only when the user has toggled it on for the current state; the
-// national map, and state view by default, always use the fixed national
-// scale (per requirement - only the state-view toggle can opt into the
-// state-relative scale).
-function activeColorScale() {
-  if (state.view === "state" && state.colorMode === "state") {
-    return getStateColorScale(state.metric, state.stateFips);
+// Like sampleValues, but for one specific month rather than sampled across
+// all of them - used to build price/income's per-month scale.
+function sampleValuesForMonth(fipsFilter, metric, monthIndex) {
+  const counties = data.counties.filter(fipsFilter);
+  const step = Math.max(1, Math.floor(counties.length / 400));
+  const samples = [];
+  for (let ci = 0; ci < counties.length; ci += step) {
+    const v = valueFor(counties[ci].fips, monthIndex, metric);
+    if (v != null && isFinite(v)) samples.push(v);
   }
-  return colorScales[state.metric];
+  return samples;
+}
+
+// Price/income's scale, recalculated for just this month (and, if `stateFips`
+// is given, just that state's counties within it) rather than fixed across
+// the whole timeline - see the comment on monthColorScaleCache above.
+function getMonthColorScale(metric, monthIndex, stateFips) {
+  const key = metric + ":" + (stateFips || "national") + ":" + monthIndex;
+  if (!monthColorScaleCache.has(key)) {
+    const fipsFilter = stateFips ? (c) => c.fips.slice(0, 2) === stateFips : () => true;
+    const samples = sampleValuesForMonth(fipsFilter, metric, monthIndex);
+    const interpolator = stateFips ? d3.interpolateOranges : d3.interpolateBlues;
+    monthColorScaleCache.set(key, scaleFromSamples(samples, interpolator));
+  }
+  return monthColorScaleCache.get(key);
+}
+
+// The scale actually used to color the map right now. Ratio uses its fixed
+// scale (state-relative variant only when the user has toggled it on for
+// the current state - per requirement, only the state-view toggle can opt
+// into that). Price/income always use this month's scale, national or
+// state-relative depending on the same toggle.
+function activeColorScale() {
+  const useStateScale = state.view === "state" && state.colorMode === "state";
+  if (state.metric === "ratio") {
+    return useStateScale ? getStateRatioColorScale(state.stateFips) : ratioColorScale;
+  }
+  return getMonthColorScale(state.metric, state.monthIndex, useStateScale ? state.stateFips : null);
 }
 
 function renderLegendSwatch() {
@@ -187,14 +229,21 @@ function renderLegendSwatch() {
       .attr("stop-color", scale(lo + t * (hi - lo)));
   }
   svg.append("rect").attr("width", "100%").attr("height", 14).attr("fill", `url(#${gradId})`);
-  const fmtLegendValue = state.metric === "price" ? fmtDollar : (v) => v.toFixed(1) + "x";
+  const fmtLegendValue = state.metric === "ratio" ? (v) => v.toFixed(1) + "x" : fmtDollar;
   document.getElementById("legend-min").textContent = fmtLegendValue(lo);
   document.getElementById("legend-max").textContent = fmtLegendValue(hi);
 
   const isStateScale = state.view === "state" && state.colorMode === "state";
-  const metricLabel = state.metric === "price" ? "Home value (ZHVI)" : "Price / Income ratio";
+  const metricLabel =
+    state.metric === "price"
+      ? "Home value (ZHVI)"
+      : state.metric === "income"
+      ? "Per-capita income"
+      : "Price / Income ratio";
   document.getElementById("legend-title").textContent =
     metricLabel + (isStateScale ? " — this state" : "");
+
+  document.getElementById("legend-scale-note").hidden = state.metric === "ratio";
 
   const legendEl = document.getElementById("map-legend");
   legendEl.classList.toggle("clickable", state.view === "state");
@@ -341,6 +390,10 @@ function setLegendCollapsed(box, toggle, collapsed) {
 function onTimelineChange(fast) {
   updateTimelineLabel();
   updateMapColors(fast);
+  // Ratio's scale is fixed across the timeline, so it never needs a redraw
+  // here; price/income are recalculated per month (see activeColorScale),
+  // so their legend swatch/min/max need to stay in step with the month.
+  if (state.metric !== "ratio") renderLegendSwatch();
   if (state.view === "nation") {
     renderNationalSummary();
   } else {
@@ -688,7 +741,9 @@ function countyTooltip(fips) {
   const label = `${name}, ${st}`;
   const v = valueFor(fips, state.monthIndex, state.metric);
   if (v == null) return `${label}\nNo data available`;
-  return state.metric === "price" ? `${label}\n${fmtDollar(v)} home value` : `${label}\n${v.toFixed(2)}x price/income`;
+  if (state.metric === "price") return `${label}\n${fmtDollar(v)} home value`;
+  if (state.metric === "income") return `${label}\n${fmtDollar(v)} per-capita income`;
+  return `${label}\n${v.toFixed(2)}x price/income`;
 }
 
 function selectCounty(fips) {

@@ -1,6 +1,8 @@
 # Joins monthly Zillow home values with the combined income table (see
-# build_income.py) into a single tidy (long) CSV, one row per county-month,
-# suitable for visualization of home-value-to-income ratios over time.
+# build_income.py) into a single tidy (long) CSV, one row per
+# county-month-home_type, suitable for visualization of home-value-to-income
+# ratios over time. home_type distinguishes Zillow's different home-value
+# series (e.g. all homes vs. single-family only) - see zillow_paths below.
 #
 # Zillow keys directly on 5-digit county FIPS (StateCodeFIPS + MunicipalCodeFIPS),
 # matching the fips column build_income.py produces, so no manual
@@ -16,9 +18,13 @@ import pandas as pd
 pd.set_option("display.max_columns", None)
 
 # UPDATE:
-# Add the path to your downloaded zillow file here
-# The file I select is normally ZHVI All Homes (SFR, Condo/Co-op) Time Series, Smoothed, Seasonally Adjusted ($), by County
-zillow_path = "./data/zillow/County_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv"
+# Zillow files to include, keyed by the home_type tag that lands in the
+# output. Add an entry here for each downloaded file you want joined in -
+# each becomes its own set of rows per county-month (see home_type below).
+zillow_paths = {
+    "all_homes": "./data/zillow/all-homes/County_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv",
+    "single_family": "./data/zillow/single-family-homes/County_zhvi_uc_sfr_tier_0.33_0.67_sm_sa_month.csv",
+}
 income_path = "./outputs/income_combined.csv"
 final_output_path = "./outputs/fips_zillow_income.csv"
 
@@ -26,21 +32,27 @@ os.makedirs(os.path.dirname(final_output_path), exist_ok=True)
 
 DATE_COL_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
-# --- Zillow: wide monthly columns -> long (fips, date, zhvi) ---
+# --- Zillow: wide monthly columns -> long (fips, date, zhvi), one home_type at a time ---
 
-zillow = pd.read_csv(
-    zillow_path,
-    dtype={"StateCodeFIPS": str, "MunicipalCodeFIPS": str},
-)
-zillow = zillow.copy()
-zillow["fips"] = zillow["StateCodeFIPS"].str.zfill(2) + zillow["MunicipalCodeFIPS"].str.zfill(3)
+zillow_long_frames = []
+for home_type, zillow_path in zillow_paths.items():
+    zillow = pd.read_csv(
+        zillow_path,
+        dtype={"StateCodeFIPS": str, "MunicipalCodeFIPS": str},
+    )
+    zillow = zillow.copy()
+    zillow["fips"] = zillow["StateCodeFIPS"].str.zfill(2) + zillow["MunicipalCodeFIPS"].str.zfill(3)
 
-date_cols = [c for c in zillow.columns if DATE_COL_RE.match(c)]
-id_cols = ["fips", "RegionName", "StateName"]
+    date_cols = [c for c in zillow.columns if DATE_COL_RE.match(c)]
+    id_cols = ["fips", "RegionName", "StateName"]
 
-zillow_long = zillow[id_cols + date_cols].melt(
-    id_vars=id_cols, var_name="date", value_name="zhvi"
-)
+    frame = zillow[id_cols + date_cols].melt(
+        id_vars=id_cols, var_name="date", value_name="zhvi"
+    )
+    frame["home_type"] = home_type
+    zillow_long_frames.append(frame)
+
+zillow_long = pd.concat(zillow_long_frames, ignore_index=True)
 zillow_long["date"] = pd.to_datetime(zillow_long["date"])
 zillow_long["year"] = zillow_long["date"].dt.year
 zillow_long["month"] = zillow_long["date"].dt.month
@@ -66,6 +78,7 @@ final = final[
         "fips",
         "RegionName",
         "StateName",
+        "home_type",
         "year_month",
         "date",
         "year",
@@ -76,5 +89,5 @@ final = final[
         "price_to_income_ratio",
     ]
 ]
-final = final.sort_values(["fips", "date"])
+final = final.sort_values(["fips", "home_type", "date"])
 final.to_csv(final_output_path, index=False, float_format="%11.3f")

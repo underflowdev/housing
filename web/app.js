@@ -10,6 +10,7 @@ const state = {
   monthIndex: 0,
   colorMode: "national", // 'national' | 'state' - state view only; nation view is always national
   metric: "ratio",       // 'ratio' | 'price' | 'income' - what the choropleth and its legend show
+  homeType: "all_homes", // key into data.zhvi - which Zillow home-value series prices/ratios come from
 };
 
 let data = null;        // { months, counties, zhvi, income }
@@ -26,9 +27,9 @@ let statesByFips = new Map(); // 2-digit fips -> { abbr, geo }
 // ratio's would leave early months uniformly dim and late months uniformly
 // bright - those get a month-relative scale instead (see
 // monthColorScaleCache below).
-let ratioColorScale = null;
-let stateColorScaleCache = new Map(); // "metric:stateFips" -> ratio's own per-state color scale, built on first use
-let monthColorScaleCache = new Map(); // "metric:scope:monthIndex" -> price/income's per-month color scale, built on first use
+let ratioColorScaleCache = new Map(); // homeType -> ratio's fixed nation-wide color scale, built on first use
+let stateColorScaleCache = new Map(); // "homeType:stateFips" -> ratio's own per-state color scale, built on first use
+let monthColorScaleCache = new Map(); // "metric:homeType:scope:monthIndex" -> price/income's per-month color scale, built on first use
 let countyPathSel = null; // d3 selection of the currently-drawn county <path> elements
 let colorModeStateFips = null; // which state colorMode currently applies to (reset on state change)
 
@@ -70,7 +71,12 @@ Promise.all([
     }
   });
 
-  ratioColorScale = buildColorScale("ratio");
+  // data.zhvi is {home_type: matrix} (see web_data_build.py) - default to
+  // "all_homes" if present, else whatever home_type the dataset does carry.
+  const homeTypes = Object.keys(data.zhvi);
+  state.homeType = homeTypes.includes("all_homes") ? "all_homes" : homeTypes[0];
+  // Only one home-value series to switch between - no point showing the toggle.
+  if (homeTypes.length < 2) document.getElementById("home-type-toggle").remove();
 
   const slider = document.getElementById("timeline-slider");
   slider.max = data.months.length - 1;
@@ -93,7 +99,7 @@ Promise.all([
 function ratioFor(fips, monthIndex) {
   const entry = byFips.get(fips);
   if (!entry) return null;
-  const zhvi = data.zhvi[entry.index][monthIndex];
+  const zhvi = data.zhvi[state.homeType][entry.index][monthIndex];
   if (zhvi == null) return null;
   const income = data.income[entry.index][monthIndex];
   if (income == null) return null;
@@ -103,7 +109,7 @@ function ratioFor(fips, monthIndex) {
 function zhviFor(fips, monthIndex) {
   const entry = byFips.get(fips);
   if (!entry) return null;
-  return data.zhvi[entry.index][monthIndex];
+  return data.zhvi[state.homeType][entry.index][monthIndex];
 }
 
 function incomeFor(fips, monthIndex) {
@@ -155,17 +161,28 @@ function buildColorScale(metric) {
   return scaleFromSamples(sampleValues(() => true, metric), d3.interpolateBlues);
 }
 
+// Ratio's fixed nation-wide scale depends on the selected home_type (it's
+// derived from zhviFor/ratioFor, which read state.homeType) - cached per
+// home_type so switching back to one already viewed doesn't rebuild it.
+function getRatioColorScale(homeType) {
+  if (!ratioColorScaleCache.has(homeType)) {
+    ratioColorScaleCache.set(homeType, buildColorScale("ratio"));
+  }
+  return ratioColorScaleCache.get(homeType);
+}
+
 // A state's own counties can have far less spread than the whole country,
 // so the fixed national scale can leave a low-variation state (e.g. Kansas)
 // looking nearly uniform. This builds (and caches) ratio's own scale from
 // just that state's own counties, in a visually distinct color scheme so
 // it's never mistaken for the national one.
 function getStateRatioColorScale(stateFips) {
-  if (!stateColorScaleCache.has(stateFips)) {
+  const key = state.homeType + ":" + stateFips;
+  if (!stateColorScaleCache.has(key)) {
     const samples = sampleValues((c) => c.fips.slice(0, 2) === stateFips, "ratio");
-    stateColorScaleCache.set(stateFips, scaleFromSamples(samples, d3.interpolateOranges));
+    stateColorScaleCache.set(key, scaleFromSamples(samples, d3.interpolateOranges));
   }
-  return stateColorScaleCache.get(stateFips);
+  return stateColorScaleCache.get(key);
 }
 
 // Like sampleValues, but for one specific month rather than sampled across
@@ -185,7 +202,7 @@ function sampleValuesForMonth(fipsFilter, metric, monthIndex) {
 // is given, just that state's counties within it) rather than fixed across
 // the whole timeline - see the comment on monthColorScaleCache above.
 function getMonthColorScale(metric, monthIndex, stateFips) {
-  const key = metric + ":" + (stateFips || "national") + ":" + monthIndex;
+  const key = metric + ":" + state.homeType + ":" + (stateFips || "national") + ":" + monthIndex;
   if (!monthColorScaleCache.has(key)) {
     const fipsFilter = stateFips ? (c) => c.fips.slice(0, 2) === stateFips : () => true;
     const samples = sampleValuesForMonth(fipsFilter, metric, monthIndex);
@@ -203,7 +220,7 @@ function getMonthColorScale(metric, monthIndex, stateFips) {
 function activeColorScale() {
   const useStateScale = state.view === "state" && state.colorMode === "state";
   if (state.metric === "ratio") {
-    return useStateScale ? getStateRatioColorScale(state.stateFips) : ratioColorScale;
+    return useStateScale ? getStateRatioColorScale(state.stateFips) : getRatioColorScale(state.homeType);
   }
   return getMonthColorScale(state.metric, state.monthIndex, useStateScale ? state.stateFips : null);
 }
@@ -245,6 +262,15 @@ function renderLegendSwatch() {
 
   document.getElementById("legend-scale-note").hidden = state.metric === "ratio";
 
+  // Home type only affects zhvi - irrelevant (and hidden) for the income metric.
+  const homeTypeToggle = document.getElementById("home-type-toggle");
+  if (homeTypeToggle) {
+    homeTypeToggle.hidden = state.metric === "income";
+    homeTypeToggle.querySelectorAll(".metric-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.homeType === state.homeType);
+    });
+  }
+
   const scaleToggle = document.getElementById("scale-toggle");
   scaleToggle.hidden = state.view !== "state";
   scaleToggle.querySelectorAll(".metric-btn").forEach((btn) => {
@@ -267,6 +293,18 @@ function setMetric(metric) {
   });
   renderLegendSwatch();
   updateMapColors();
+}
+
+// Switches which Zillow home-value series (data.zhvi[homeType]) the map,
+// summary stats, county list graying, and detail charts all read from.
+// Touches far more than just map color (ratio/price values themselves
+// change), so this re-renders everything via render() (which itself calls
+// renderMap() -> renderLegendSwatch()/updateMapColors()) rather than just
+// updateMapColors().
+function setHomeType(homeType) {
+  if (state.homeType === homeType) return;
+  state.homeType = homeType;
+  render();
 }
 
 // ---------- routing (hash-based, safe for static S3 hosting) ----------
@@ -321,6 +359,10 @@ function wireControls() {
 
   document.querySelectorAll("#metric-toggle .metric-btn").forEach((btn) => {
     btn.addEventListener("click", () => setMetric(btn.dataset.metric));
+  });
+
+  document.querySelectorAll("#home-type-toggle .metric-btn").forEach((btn) => {
+    btn.addEventListener("click", () => setHomeType(btn.dataset.homeType));
   });
 
   document.querySelectorAll("#scale-toggle .metric-btn").forEach((btn) => {
@@ -775,7 +817,7 @@ function renderCountyList(filterText) {
 function countyStatsRows(filterFn) {
   return data.counties.filter(filterFn).map((c) => {
     const entry = byFips.get(c.fips);
-    const zhvi = data.zhvi[entry.index][state.monthIndex];
+    const zhvi = data.zhvi[state.homeType][entry.index][state.monthIndex];
     const income = data.income[entry.index][state.monthIndex];
     const ratio = zhvi != null && income != null ? zhvi / income : null;
     return { fips: c.fips, name: c.name, state: c.state, zhvi, income, ratio };
@@ -933,7 +975,7 @@ function renderDetail() {
   legendEl.hidden = false;
 
   const months = data.months;
-  const zhviSeries = months.map((m, i) => data.zhvi[entry.index][i]);
+  const zhviSeries = months.map((m, i) => data.zhvi[state.homeType][entry.index][i]);
   const incomeSeries = months.map((m, i) => data.income[entry.index][i]);
   const ratioSeries = months.map((m, i) =>
     zhviSeries[i] != null && incomeSeries[i] != null ? zhviSeries[i] / incomeSeries[i] : null

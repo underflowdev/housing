@@ -423,7 +423,7 @@ function render() {
   if (state.view === "nation") {
     listPanel.hidden = true;
     detailPanel.hidden = true;
-    document.getElementById("crumb-title").textContent = "United States";
+    document.getElementById("crumb-title").hidden = true;
     document.getElementById("nation-hint").hidden = false;
     renderMap();
     renderNationalSummary();
@@ -431,6 +431,7 @@ function render() {
     document.getElementById("nation-hint").hidden = true;
     listPanel.hidden = false;
     detailPanel.hidden = false;
+    document.getElementById("crumb-title").hidden = false;
     document.getElementById("crumb-title").textContent = stateFullName(state.stateFips);
     renderCountyList("");
     renderMap();
@@ -456,6 +457,8 @@ function stateFullName(fips) {
 function renderBreadcrumb() {
   const el = document.getElementById("breadcrumb");
   el.innerHTML = "";
+  if (state.view === "nation") return;
+
   const nationLink = document.createElement("a");
   nationLink.textContent = "United States";
   nationLink.addEventListener("click", () => {
@@ -467,23 +470,21 @@ function renderBreadcrumb() {
   });
   el.appendChild(nationLink);
 
-  if (state.view === "state") {
-    el.appendChild(document.createTextNode(" › "));
-    const stateSpan = document.createElement("a");
-    stateSpan.textContent = stateName(state.stateFips);
-    stateSpan.addEventListener("click", () => {
-      state.countyFips = null;
-      pushHash();
-      render();
-    });
-    el.appendChild(stateSpan);
+  el.appendChild(document.createTextNode(" › "));
+  const stateSpan = document.createElement("a");
+  stateSpan.textContent = stateName(state.stateFips);
+  stateSpan.addEventListener("click", () => {
+    state.countyFips = null;
+    pushHash();
+    render();
+  });
+  el.appendChild(stateSpan);
 
-    if (state.countyFips) {
-      el.appendChild(document.createTextNode(" › "));
-      const span = document.createElement("span");
-      span.textContent = countyDisplayInfo(state.countyFips).name;
-      el.appendChild(span);
-    }
+  if (state.countyFips) {
+    el.appendChild(document.createTextNode(" › "));
+    const span = document.createElement("span");
+    span.textContent = countyDisplayInfo(state.countyFips).name;
+    el.appendChild(span);
   }
 }
 

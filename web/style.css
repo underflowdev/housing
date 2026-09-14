@@ -319,6 +319,33 @@ body {
   margin-bottom: 0.3rem;
 }
 
+.metric-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.metric-btn {
+  border: none;
+  background: var(--panel-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+}
+
+.metric-btn + .metric-btn {
+  border-left: 1px solid var(--border);
+}
+
+.metric-btn.active {
+  background: var(--accent-solid);
+  color: white;
+}
+
 #legend-swatch {
   width: 100%;
   display: block;

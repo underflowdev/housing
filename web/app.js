@@ -9,6 +9,7 @@ const state = {
   countyFips: null,     // 5-digit, selected for the detail inset
   monthIndex: 0,
   colorMode: "national", // 'national' | 'state' - state view only; nation view is always national
+  metric: "ratio",       // 'ratio' | 'price' - what the choropleth and its legend show
 };
 
 let data = null;        // { months, counties, zhvi, income }
@@ -18,8 +19,8 @@ let stateGeo = null;    // GeoJSON FeatureCollection, all states
 let byFips = new Map(); // fips -> { county, index, geo } - only counties Zillow covers
 let countyNameByFips = new Map(); // fips -> {name, state} - every county in the map, including ones Zillow doesn't cover
 let statesByFips = new Map(); // 2-digit fips -> { abbr, geo }
-let colorScale = null;         // fixed national color scale - the main map always uses this
-let stateColorScaleCache = new Map(); // stateFips -> its own color scale, built on first use
+let colorScales = { ratio: null, price: null }; // fixed national color scale per metric - the main map always uses these
+let stateColorScaleCache = new Map(); // "metric:stateFips" -> its own color scale, built on first use
 let countyPathSel = null; // d3 selection of the currently-drawn county <path> elements
 let colorModeStateFips = null; // which state colorMode currently applies to (reset on state change)
 
@@ -61,7 +62,8 @@ Promise.all([
     }
   });
 
-  colorScale = buildColorScale();
+  colorScales.ratio = buildColorScale("ratio");
+  colorScales.price = buildColorScale("price");
 
   const slider = document.getElementById("timeline-slider");
   slider.max = data.months.length - 1;
@@ -91,6 +93,17 @@ function ratioFor(fips, monthIndex) {
   return zhvi / income;
 }
 
+function zhviFor(fips, monthIndex) {
+  const entry = byFips.get(fips);
+  if (!entry) return null;
+  return data.zhvi[entry.index][monthIndex];
+}
+
+// The value the choropleth colors by, for whichever metric is selected.
+function valueFor(fips, monthIndex, metric) {
+  return metric === "price" ? zhviFor(fips, monthIndex) : ratioFor(fips, monthIndex);
+}
+
 function latestMonthWithIncomeData() {
   for (let mi = data.months.length - 1; mi >= 0; mi--) {
     const hasAny = data.income.some((row) => row[mi] != null);
@@ -99,18 +112,18 @@ function latestMonthWithIncomeData() {
   return data.months.length - 1;
 }
 
-// Samples ratios across whatever counties `fipsFilter` selects (2nd/98th
+// Samples values across whatever counties `fipsFilter` selects (2nd/98th
 // percentile of the sample becomes the scale's domain) so a few outlier
 // counties don't wash out the color range for everyone else.
-function sampleRatios(fipsFilter) {
+function sampleValues(fipsFilter, metric) {
   const counties = data.counties.filter(fipsFilter);
   const step = Math.max(1, Math.floor(counties.length / 400)); // subsample if there are many
   const samples = [];
   for (let ci = 0; ci < counties.length; ci += step) {
     const fips = counties[ci].fips;
     for (let mi = 0; mi < data.months.length; mi += 6) {
-      const r = ratioFor(fips, mi);
-      if (r != null && isFinite(r)) samples.push(r);
+      const v = valueFor(fips, mi, metric);
+      if (v != null && isFinite(v)) samples.push(v);
     }
   }
   return samples;
@@ -123,21 +136,22 @@ function scaleFromSamples(samples, interpolator) {
   return d3.scaleSequential(interpolator).domain([lo, hi]).clamp(true);
 }
 
-function buildColorScale() {
-  return scaleFromSamples(sampleRatios(() => true), d3.interpolateBlues);
+function buildColorScale(metric) {
+  return scaleFromSamples(sampleValues(() => true, metric), d3.interpolateBlues);
 }
 
-// A state's own counties can have far less ratio spread than the whole
-// country, so the fixed national scale can leave a low-variation state
-// (e.g. Kansas) looking nearly uniform. This builds (and caches) a scale
-// from just that state's own counties, in a visually distinct color
-// scheme so it's never mistaken for the national one.
-function getStateColorScale(stateFips) {
-  if (!stateColorScaleCache.has(stateFips)) {
-    const samples = sampleRatios((c) => c.fips.slice(0, 2) === stateFips);
-    stateColorScaleCache.set(stateFips, scaleFromSamples(samples, d3.interpolateOranges));
+// A state's own counties can have far less spread than the whole country,
+// so the fixed national scale can leave a low-variation state (e.g. Kansas)
+// looking nearly uniform. This builds (and caches, per metric) a scale from
+// just that state's own counties, in a visually distinct color scheme so
+// it's never mistaken for the national one.
+function getStateColorScale(metric, stateFips) {
+  const key = metric + ":" + stateFips;
+  if (!stateColorScaleCache.has(key)) {
+    const samples = sampleValues((c) => c.fips.slice(0, 2) === stateFips, metric);
+    stateColorScaleCache.set(key, scaleFromSamples(samples, d3.interpolateOranges));
   }
-  return stateColorScaleCache.get(stateFips);
+  return stateColorScaleCache.get(key);
 }
 
 // The scale actually used to color the map right now: the state view's own
@@ -147,9 +161,9 @@ function getStateColorScale(stateFips) {
 // state-relative scale).
 function activeColorScale() {
   if (state.view === "state" && state.colorMode === "state") {
-    return getStateColorScale(state.stateFips);
+    return getStateColorScale(state.metric, state.stateFips);
   }
-  return colorScale;
+  return colorScales[state.metric];
 }
 
 function renderLegendSwatch() {
@@ -173,12 +187,14 @@ function renderLegendSwatch() {
       .attr("stop-color", scale(lo + t * (hi - lo)));
   }
   svg.append("rect").attr("width", "100%").attr("height", 14).attr("fill", `url(#${gradId})`);
-  document.getElementById("legend-min").textContent = lo.toFixed(1) + "x";
-  document.getElementById("legend-max").textContent = hi.toFixed(1) + "x";
+  const fmtLegendValue = state.metric === "price" ? fmtDollar : (v) => v.toFixed(1) + "x";
+  document.getElementById("legend-min").textContent = fmtLegendValue(lo);
+  document.getElementById("legend-max").textContent = fmtLegendValue(hi);
 
   const isStateScale = state.view === "state" && state.colorMode === "state";
+  const metricLabel = state.metric === "price" ? "Home value (ZHVI)" : "Price / Income ratio";
   document.getElementById("legend-title").textContent =
-    "Price / Income ratio" + (isStateScale ? " — this state" : "");
+    metricLabel + (isStateScale ? " — this state" : "");
 
   const legendEl = document.getElementById("map-legend");
   legendEl.classList.toggle("clickable", state.view === "state");
@@ -195,6 +211,16 @@ function renderLegendSwatch() {
 function toggleColorMode() {
   if (state.view !== "state") return;
   state.colorMode = state.colorMode === "state" ? "national" : "state";
+  renderLegendSwatch();
+  updateMapColors();
+}
+
+function setMetric(metric) {
+  if (state.metric === metric) return;
+  state.metric = metric;
+  document.querySelectorAll(".metric-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.metric === metric);
+  });
   renderLegendSwatch();
   updateMapColors();
 }
@@ -250,6 +276,15 @@ function wireControls() {
   });
 
   document.getElementById("map-legend").addEventListener("click", toggleColorMode);
+
+  document.querySelectorAll(".metric-btn").forEach((btn) => {
+    btn.addEventListener("click", (event) => {
+      // #map-legend itself has a click handler (state-scale toggle) - don't
+      // let that also fire when the user meant to switch metrics.
+      event.stopPropagation();
+      setMetric(btn.dataset.metric);
+    });
+  });
 
   wireCollapsibleLegends();
 }
@@ -625,13 +660,13 @@ function updateMapColors(fast) {
   const scale = activeColorScale();
   countyPathSel
     .attr("class", (d) => {
-      const noData = ratioFor(d.id, state.monthIndex) == null ? " no-data" : "";
+      const noData = valueFor(d.id, state.monthIndex, state.metric) == null ? " no-data" : "";
       const selected = d.id === state.countyFips ? " selected" : "";
       return "county-shape" + noData + selected;
     })
     .attr("fill", (d) => {
-      const r = ratioFor(d.id, state.monthIndex);
-      return r == null ? null : scale(r);
+      const v = valueFor(d.id, state.monthIndex, state.metric);
+      return v == null ? null : scale(v);
     });
   // Skipped during animated play: a per-element string rebuild + text-node
   // mutation for every county, every frame, purely for an off-screen
@@ -651,8 +686,9 @@ function countyDisplayInfo(fips) {
 function countyTooltip(fips) {
   const { name, state: st } = countyDisplayInfo(fips);
   const label = `${name}, ${st}`;
-  const r = ratioFor(fips, state.monthIndex);
-  return r == null ? `${label}\nNo data available` : `${label}\n${r.toFixed(2)}x price/income`;
+  const v = valueFor(fips, state.monthIndex, state.metric);
+  if (v == null) return `${label}\nNo data available`;
+  return state.metric === "price" ? `${label}\n${fmtDollar(v)} home value` : `${label}\n${v.toFixed(2)}x price/income`;
 }
 
 function selectCounty(fips) {

@@ -67,6 +67,17 @@
 
   <div id="info-row">
     <div id="map-legend" class="legend">
+      <div id="toggle-row">
+        <div id="metric-toggle" class="metric-toggle" role="group" aria-label="Map metric">
+          <button type="button" class="metric-btn active" data-metric="ratio">Ratio</button>
+          <button type="button" class="metric-btn" data-metric="price">Price</button>
+          <button type="button" class="metric-btn" data-metric="income">Income</button>
+        </div>
+        <div id="scale-toggle" class="metric-toggle" role="group" aria-label="Color scale range" hidden>
+          <button type="button" class="metric-btn active" data-scale="national">National</button>
+          <button type="button" class="metric-btn" data-scale="state">This state</button>
+        </div>
+      </div>
       <div id="legend-title" class="legend-title">Price / Income ratio</div>
       <svg id="legend-swatch" height="14"></svg>
       <div class="legend-labels">
@@ -74,7 +85,7 @@
         <span id="legend-max"></span>
       </div>
       <div class="legend-note">Gray = no data available</div>
-      <div id="legend-toggle-hint" class="legend-note" hidden></div>
+      <div id="legend-scale-note" class="legend-note" hidden>Scale recalculated for this month</div>
     </div>
 
     <div id="sources-legend" class="legend sources-legend collapsible">

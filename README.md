@@ -66,13 +66,17 @@ years are simply left blank instead of estimated.
 Zillow's data isn't available through an API, so this step is manual:
 
 1. Go to https://www.zillow.com/research/data/
-2. Download a **county-level** dataset — this pipeline was built against
-   "ZHVI All Homes (SFR, Condo/Co-op) Time Series, Smoothed, Seasonally
-   Adjusted ($), by County", but any similarly-shaped county-level Zillow CSV
-   should work.
-3. Save the file under `data/zillow/`.
-4. Open `create_output.py` and update the `zillow_path` variable (near the
-   top, marked `# UPDATE:`) to point at the file you just downloaded.
+2. Download one or more **county-level** datasets — this pipeline was built
+   against "ZHVI All Homes (SFR, Condo/Co-op) Time Series, Smoothed,
+   Seasonally Adjusted ($), by County", but any similarly-shaped county-level
+   Zillow CSV should work (e.g. the single-family-only variant).
+3. Save each file under its own subfolder of `data/zillow/`, named for the
+   home-value series it holds, e.g. `data/zillow/all-homes/` and
+   `data/zillow/single-family-homes/`.
+4. Open `create_output.py` and `web_data_build.py` and update the
+   `zillow_paths` dict in each (near the top, marked `# UPDATE:`) so each
+   entry's key is a short `home_type` tag (e.g. `all_homes`,
+   `single_family`) and its value is the path to the matching file.
 
 ## 5. Build the output
 
@@ -84,9 +88,10 @@ python build_income.py && python create_output.py
   table (interpolating FRED's annual figures into a smooth monthly series,
   and extrapolating years FRED hasn't published yet using BLS QCEW wage
   growth rates). Writes `outputs/income_combined.csv`.
-- `create_output.py` merges that with the Zillow data on `(fips, year, month)`.
-  Writes `outputs/fips_zillow_income.csv` — the final tidy output, one row per
-  county-month with a `price_to_income_ratio` column.
+- `create_output.py` merges that with each configured Zillow file on
+  `(fips, year, month)`. Writes `outputs/fips_zillow_income.csv` — the final
+  tidy output, one row per county-month-home_type (see `home_type` column)
+  with a `price_to_income_ratio` column.
 
 Search the codebase for `# UPDATE:` comments to find every value/path you may
 need to edit before running.

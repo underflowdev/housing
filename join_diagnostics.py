@@ -12,7 +12,9 @@ import pandas as pd
 
 fred_data_dir = "./data/fred"
 fips_path = "./data/nrcs/nrcs_fips_codes.csv"
-zillow_path = "./data/zillow/County_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv"
+# Match rate is driven by county naming/FIPS coverage, not by which Zillow
+# home-value series is used, so any one home_type file works here.
+zillow_path = "./data/zillow/all-homes/County_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv"
 income_path = "./outputs/income_combined.csv"
 
 # fmt: off

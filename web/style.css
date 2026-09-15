@@ -217,6 +217,13 @@ body {
   display: block;
 }
 
+/* The price chart now plots one line per home_type on a shared y scale
+   (see renderDetail in app.js) - all_homes and single_family often track
+   closely, so a bit more vertical room helps keep them visually distinct. */
+#detail-svg-price {
+  height: 150px;
+}
+
 /* Overrides the inline stroke="#999" set in drawMiniChart() - a CSS rule
    beats a presentation attribute regardless of specificity, so this wins
    without touching the JS. */

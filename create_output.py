@@ -60,11 +60,15 @@ zillow_long["month"] = zillow_long["date"].dt.month
 # global timestamp (e.g. a choropleth's time slider), rather than parsing "date".
 zillow_long["year_month"] = zillow_long["date"].dt.strftime("%Y-%m")
 
-# --- income: pre-combined by build_income.py, monthly (fips, year, month, income_est, income_source) ---
+# --- income: pre-combined by build_income.py, monthly (fips, year, month,
+# --- income_est, income_source, household_income_est, household_income_source) ---
 # Already interpolated between annual anchors - see build_income.py - so
 # this is a genuine month-by-month income series, not a flat per-year value.
 
-income = pd.read_csv(income_path, dtype={"fips": str})
+income = pd.read_csv(
+    income_path,
+    dtype={"fips": str, "income_source": str, "household_income_source": str},
+)
 income["fips"] = income["fips"].str.zfill(5)
 
 # --- merge on (fips, year, month): both sides are already monthly ---
@@ -72,6 +76,7 @@ income["fips"] = income["fips"].str.zfill(5)
 final = pd.merge(zillow_long, income, on=["fips", "year", "month"], how="left")
 
 final["price_to_income_ratio"] = final["zhvi"] / final["income_est"]
+final["price_to_household_income_ratio"] = final["zhvi"] / final["household_income_est"]
 
 final = final[
     [
@@ -87,6 +92,9 @@ final = final[
         "income_est",
         "income_source",
         "price_to_income_ratio",
+        "household_income_est",
+        "household_income_source",
+        "price_to_household_income_ratio",
     ]
 ]
 final = final.sort_values(["fips", "home_type", "date"])

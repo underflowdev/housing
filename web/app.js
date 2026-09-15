@@ -9,11 +9,12 @@ const state = {
   countyFips: null,     // 5-digit, selected for the detail inset
   monthIndex: 0,
   colorMode: "national", // 'national' | 'state' - state view only; nation view is always national
-  metric: "ratio",       // 'ratio' | 'price' | 'income' - what the choropleth and its legend show
+  metric: "ratio",       // 'ratio' | 'price' | 'income' | 'household_income' - what the choropleth and its legend show
   homeType: "all_homes", // key into data.zhvi - which Zillow home-value series prices/ratios come from
+  ratioBasis: "percapita", // 'percapita' | 'household' - which income series the Ratio metric divides by
 };
 
-let data = null;        // { months, counties, zhvi, income }
+let data = null;        // { months, counties, zhvi, income, householdIncome }
 let rawTopo = null;     // raw TopoJSON topology (needed for mesh())
 let nationGeo = null;   // GeoJSON FeatureCollection, all counties
 let stateGeo = null;    // GeoJSON FeatureCollection, all states
@@ -32,6 +33,11 @@ let stateColorScaleCache = new Map(); // "homeType:stateFips" -> ratio's own per
 let monthColorScaleCache = new Map(); // "metric:homeType:scope:monthIndex" -> price/income's per-month color scale, built on first use
 let countyPathSel = null; // d3 selection of the currently-drawn county <path> elements
 let colorModeStateFips = null; // which state colorMode currently applies to (reset on state change)
+let homeTypeLabels = new Map(); // home_type key -> its toggle button's display label (e.g. "All homes")
+
+function homeTypeLabel(homeType) {
+  return homeTypeLabels.get(homeType) || homeType;
+}
 
 // ---------- boot ----------
 
@@ -75,6 +81,14 @@ Promise.all([
   // "all_homes" if present, else whatever home_type the dataset does carry.
   const homeTypes = Object.keys(data.zhvi);
   state.homeType = homeTypes.includes("all_homes") ? "all_homes" : homeTypes[0];
+  // Snapshot each home_type's display label from its toggle button (e.g.
+  // "All homes", "Single-family") before possibly removing the toggle below
+  // - homeTypeLabel() (used by the detail inset's price chart title) still
+  // needs a label even when there's only one home_type and no toggle to read
+  // it from.
+  document.querySelectorAll("#home-type-toggle .metric-btn").forEach((btn) => {
+    homeTypeLabels.set(btn.dataset.homeType, btn.textContent);
+  });
   // Only one home-value series to switch between - no point showing the toggle.
   if (homeTypes.length < 2) document.getElementById("home-type-toggle").remove();
 
@@ -96,12 +110,19 @@ Promise.all([
 
 // ---------- data helpers ----------
 
+// Which income matrix the Ratio metric currently divides by - per-capita
+// (data.income) or household (data.householdIncome), per state.ratioBasis.
+function ratioBasisIncomeAt(index, monthIndex) {
+  const matrix = state.ratioBasis === "household" ? data.householdIncome : data.income;
+  return matrix[index][monthIndex];
+}
+
 function ratioFor(fips, monthIndex) {
   const entry = byFips.get(fips);
   if (!entry) return null;
   const zhvi = data.zhvi[state.homeType][entry.index][monthIndex];
   if (zhvi == null) return null;
-  const income = data.income[entry.index][monthIndex];
+  const income = ratioBasisIncomeAt(entry.index, monthIndex);
   if (income == null) return null;
   return zhvi / income;
 }
@@ -118,10 +139,17 @@ function incomeFor(fips, monthIndex) {
   return data.income[entry.index][monthIndex];
 }
 
+function householdIncomeFor(fips, monthIndex) {
+  const entry = byFips.get(fips);
+  if (!entry) return null;
+  return data.householdIncome[entry.index][monthIndex];
+}
+
 // The value the choropleth colors by, for whichever metric is selected.
 function valueFor(fips, monthIndex, metric) {
   if (metric === "price") return zhviFor(fips, monthIndex);
   if (metric === "income") return incomeFor(fips, monthIndex);
+  if (metric === "household_income") return householdIncomeFor(fips, monthIndex);
   return ratioFor(fips, monthIndex);
 }
 
@@ -161,14 +189,16 @@ function buildColorScale(metric) {
   return scaleFromSamples(sampleValues(() => true, metric), d3.interpolateBlues);
 }
 
-// Ratio's fixed nation-wide scale depends on the selected home_type (it's
-// derived from zhviFor/ratioFor, which read state.homeType) - cached per
-// home_type so switching back to one already viewed doesn't rebuild it.
+// Ratio's fixed nation-wide scale depends on the selected home_type and
+// ratio basis (it's derived from zhviFor/ratioFor, which read state.homeType
+// and state.ratioBasis) - cached per combination so switching back to one
+// already viewed doesn't rebuild it.
 function getRatioColorScale(homeType) {
-  if (!ratioColorScaleCache.has(homeType)) {
-    ratioColorScaleCache.set(homeType, buildColorScale("ratio"));
+  const key = homeType + ":" + state.ratioBasis;
+  if (!ratioColorScaleCache.has(key)) {
+    ratioColorScaleCache.set(key, buildColorScale("ratio"));
   }
-  return ratioColorScaleCache.get(homeType);
+  return ratioColorScaleCache.get(key);
 }
 
 // A state's own counties can have far less spread than the whole country,
@@ -177,7 +207,7 @@ function getRatioColorScale(homeType) {
 // just that state's own counties, in a visually distinct color scheme so
 // it's never mistaken for the national one.
 function getStateRatioColorScale(stateFips) {
-  const key = state.homeType + ":" + stateFips;
+  const key = state.homeType + ":" + state.ratioBasis + ":" + stateFips;
   if (!stateColorScaleCache.has(key)) {
     const samples = sampleValues((c) => c.fips.slice(0, 2) === stateFips, "ratio");
     stateColorScaleCache.set(key, scaleFromSamples(samples, d3.interpolateOranges));
@@ -253,21 +283,32 @@ function renderLegendSwatch() {
   const isStateScale = state.view === "state" && state.colorMode === "state";
   const metricLabel =
     state.metric === "price"
-      ? "Home value (ZHVI)"
+      ? `Home value (ZHVI, ${homeTypeLabel(state.homeType)})`
       : state.metric === "income"
-      ? "Per-capita income"
-      : "Price / Income ratio";
+      ? "Mean per-capita income"
+      : state.metric === "household_income"
+      ? "Median household income"
+      : "Price / " + (state.ratioBasis === "household" ? "median household income" : "mean per-capita income") + " ratio";
   document.getElementById("legend-title").textContent =
     metricLabel + (isStateScale ? " — this state" : "");
 
   document.getElementById("legend-scale-note").hidden = state.metric === "ratio";
 
-  // Home type only affects zhvi - irrelevant (and hidden) for the income metric.
+  // Home type only affects zhvi - irrelevant (and hidden) for either income metric.
   const homeTypeToggle = document.getElementById("home-type-toggle");
   if (homeTypeToggle) {
-    homeTypeToggle.hidden = state.metric === "income";
+    homeTypeToggle.hidden = state.metric === "income" || state.metric === "household_income";
     homeTypeToggle.querySelectorAll(".metric-btn").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.homeType === state.homeType);
+    });
+  }
+
+  // Which income series Ratio divides by - only meaningful for the ratio metric.
+  const ratioBasisToggle = document.getElementById("ratio-basis-toggle");
+  if (ratioBasisToggle) {
+    ratioBasisToggle.hidden = state.metric !== "ratio";
+    ratioBasisToggle.querySelectorAll(".metric-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.ratioBasis === state.ratioBasis);
     });
   }
 
@@ -293,6 +334,20 @@ function setMetric(metric) {
   });
   renderLegendSwatch();
   updateMapColors();
+}
+
+// Switches which income series the Ratio metric divides by. Affects the
+// ratio choropleth, its fixed color scale (see getRatioColorScale), and the
+// summary stat cards' ratio figure (see countyStatsRows) - not the detail
+// inset's own ratio chart, which stays a fixed per-capita reference view
+// (already labeled as such there).
+function setRatioBasis(basis) {
+  if (state.ratioBasis === basis) return;
+  state.ratioBasis = basis;
+  renderLegendSwatch();
+  updateMapColors();
+  if (state.view === "nation") renderNationalSummary();
+  else renderStateSummary();
 }
 
 // Switches which Zillow home-value series (data.zhvi[homeType]) the map,
@@ -363,6 +418,10 @@ function wireControls() {
 
   document.querySelectorAll("#home-type-toggle .metric-btn").forEach((btn) => {
     btn.addEventListener("click", () => setHomeType(btn.dataset.homeType));
+  });
+
+  document.querySelectorAll("#ratio-basis-toggle .metric-btn").forEach((btn) => {
+    btn.addEventListener("click", () => setRatioBasis(btn.dataset.ratioBasis));
   });
 
   document.querySelectorAll("#scale-toggle .metric-btn").forEach((btn) => {
@@ -775,8 +834,9 @@ function countyTooltip(fips) {
   const label = `${name}, ${st}`;
   const v = valueFor(fips, state.monthIndex, state.metric);
   if (v == null) return `${label}\nNo data available`;
-  if (state.metric === "price") return `${label}\n${fmtDollar(v)} home value`;
-  if (state.metric === "income") return `${label}\n${fmtDollar(v)} per-capita income`;
+  if (state.metric === "price") return `${label}\n${fmtDollar(v)} home value (${homeTypeLabel(state.homeType)})`;
+  if (state.metric === "income") return `${label}\n${fmtDollar(v)} mean per-capita income`;
+  if (state.metric === "household_income") return `${label}\n${fmtDollar(v)} median household income`;
   return `${label}\n${v.toFixed(2)}x price/income`;
 }
 
@@ -818,9 +878,15 @@ function countyStatsRows(filterFn) {
   return data.counties.filter(filterFn).map((c) => {
     const entry = byFips.get(c.fips);
     const zhvi = data.zhvi[state.homeType][entry.index][state.monthIndex];
+    // "income" here is always per-capita, for the Income stat card, which is
+    // independent of the ratio-basis toggle (the Household Income metric has
+    // its own card - see below); "ratioIncome" follows state.ratioBasis, for
+    // the ratio card, so it stays consistent with the map's Ratio metric.
     const income = data.income[entry.index][state.monthIndex];
-    const ratio = zhvi != null && income != null ? zhvi / income : null;
-    return { fips: c.fips, name: c.name, state: c.state, zhvi, income, ratio };
+    const householdIncome = data.householdIncome[entry.index][state.monthIndex];
+    const ratioIncome = ratioBasisIncomeAt(entry.index, state.monthIndex);
+    const ratio = zhvi != null && ratioIncome != null ? zhvi / ratioIncome : null;
+    return { fips: c.fips, name: c.name, state: c.state, zhvi, income, householdIncome, ratio };
   });
 }
 
@@ -837,6 +903,7 @@ function renderSummaryStatCards(el, rows, avgLabel, totalCount, showState) {
 
   const withZhvi = rows.filter((r) => r.zhvi != null);
   const withIncome = rows.filter((r) => r.income != null);
+  const withHouseholdIncome = rows.filter((r) => r.householdIncome != null);
   const withRatio = rows.filter((r) => r.ratio != null);
 
   addStatCard(el, "Coverage this month", [
@@ -845,7 +912,10 @@ function renderSummaryStatCards(el, rows, avgLabel, totalCount, showState) {
 
   if (withZhvi.length) {
     const avgZhvi = withZhvi.reduce((sum, r) => sum + r.zhvi, 0) / withZhvi.length;
-    addStatCard(el, "Home value (ZHVI)", [
+    // Matches the state-view detail inset's price chart title (see
+    // renderDetail) - both name the ZHVI series so switching the home-type
+    // toggle doesn't silently change what's shown without saying so.
+    addStatCard(el, `Home value (ZHVI, ${homeTypeLabel(state.homeType)})`, [
       { label: "Highest", value: fmtDollar(maxBy(withZhvi, "zhvi").zhvi), county: maxBy(withZhvi, "zhvi") },
       { label: "Lowest", value: fmtDollar(minBy(withZhvi, "zhvi").zhvi), county: minBy(withZhvi, "zhvi") },
       { label: avgLabel, value: fmtDollar(avgZhvi), county: null },
@@ -854,16 +924,41 @@ function renderSummaryStatCards(el, rows, avgLabel, totalCount, showState) {
 
   if (withIncome.length) {
     const avgIncome = withIncome.reduce((sum, r) => sum + r.income, 0) / withIncome.length;
-    addStatCard(el, "Per-capita income", [
+    // "Mean" called out explicitly - BEA's per-capita figure is a mean (all
+    // income types / population), unlike household income's median below,
+    // and that distinction is exactly what makes a single very-high-income
+    // county (e.g. Teton County, WY) dominate this card without dominating
+    // the household one.
+    addStatCard(el, "Mean per-capita income", [
       { label: "Highest", value: fmtDollar(maxBy(withIncome, "income").income), county: maxBy(withIncome, "income") },
       { label: "Lowest", value: fmtDollar(minBy(withIncome, "income").income), county: minBy(withIncome, "income") },
       { label: avgLabel, value: fmtDollar(avgIncome), county: null },
     ], showState);
   }
 
+  if (withHouseholdIncome.length) {
+    const avgHouseholdIncome =
+      withHouseholdIncome.reduce((sum, r) => sum + r.householdIncome, 0) / withHouseholdIncome.length;
+    addStatCard(el, "Median household income", [
+      {
+        label: "Highest",
+        value: fmtDollar(maxBy(withHouseholdIncome, "householdIncome").householdIncome),
+        county: maxBy(withHouseholdIncome, "householdIncome"),
+      },
+      {
+        label: "Lowest",
+        value: fmtDollar(minBy(withHouseholdIncome, "householdIncome").householdIncome),
+        county: minBy(withHouseholdIncome, "householdIncome"),
+      },
+      { label: avgLabel, value: fmtDollar(avgHouseholdIncome), county: null },
+    ], showState);
+  }
+
   if (withRatio.length) {
     const avgRatio = withRatio.reduce((sum, r) => sum + r.ratio, 0) / withRatio.length;
-    addStatCard(el, "Price / income ratio", [
+    const ratioCardTitle =
+      "Price / " + (state.ratioBasis === "household" ? "median household income" : "mean per-capita income") + " ratio";
+    addStatCard(el, ratioCardTitle, [
       { label: "Highest", value: maxBy(withRatio, "ratio").ratio.toFixed(2) + "x", county: maxBy(withRatio, "ratio") },
       { label: "Lowest", value: minBy(withRatio, "ratio").ratio.toFixed(2) + "x", county: minBy(withRatio, "ratio") },
       { label: avgLabel, value: avgRatio.toFixed(2) + "x", county: null },
@@ -945,6 +1040,23 @@ function addStatCard(container, title, items, showState) {
 const PRICE_COLOR = "#2b6cb0";
 const INCOME_COLOR = "#d69e2e";
 const RATIO_COLOR = "#2c7a7b";
+// Home-value chart shows one line per available home_type (see renderDetail)
+// rather than just the one the map's home-type toggle currently selects -
+// each needs its own stable color so the legend/lines stay consistent
+// across re-renders regardless of Object.keys() ordering. all_homes keeps
+// PRICE_COLOR (the chart's color before there were multiple lines); any
+// other home_type - single_family today, whatever gets configured later -
+// pulls from a small rotating fallback palette.
+const HOME_TYPE_COLORS = { all_homes: PRICE_COLOR };
+const HOME_TYPE_FALLBACK_COLORS = ["#805ad5", "#38a169", "#dd6b20", "#d53f8c"];
+let homeTypeFallbackCount = 0;
+function homeTypeColor(homeType) {
+  if (!HOME_TYPE_COLORS[homeType]) {
+    HOME_TYPE_COLORS[homeType] = HOME_TYPE_FALLBACK_COLORS[homeTypeFallbackCount % HOME_TYPE_FALLBACK_COLORS.length];
+    homeTypeFallbackCount++;
+  }
+  return HOME_TYPE_COLORS[homeType];
+}
 
 // x scale shared by all three mini-charts (same domain/range for all three,
 // since they're drawn at the same width with the same margins) - stashed so
@@ -975,7 +1087,19 @@ function renderDetail() {
   legendEl.hidden = false;
 
   const months = data.months;
-  const zhviSeries = months.map((m, i) => data.zhvi[state.homeType][entry.index][i]);
+  // The price chart plots every configured home_type at once (not just the
+  // map's currently-selected state.homeType) - see the price-chart series
+  // build below - so its title doesn't need to name one; the per-line
+  // legend does that instead.
+  document.getElementById("detail-price-title").textContent = "Home value (ZHVI, $)";
+  const homeTypes = Object.keys(data.zhvi);
+  const zhviSeriesByType = {};
+  homeTypes.forEach((ht) => {
+    zhviSeriesByType[ht] = months.map((m, i) => data.zhvi[ht][entry.index][i]);
+  });
+  // Ratio and the ratio/income charts below still use the map's currently
+  // selected home_type - only the price chart itself shows all of them.
+  const zhviSeries = zhviSeriesByType[state.homeType];
   const incomeSeries = months.map((m, i) => data.income[entry.index][i]);
   const ratioSeries = months.map((m, i) =>
     zhviSeries[i] != null && incomeSeries[i] != null ? zhviSeries[i] / incomeSeries[i] : null
@@ -1008,7 +1132,15 @@ function renderDetail() {
     months,
     showXAxis: false,
     yFormat: (d) => "$" + d3.format(".2s")(d),
-    series: [{ values: zhviSeries, color: PRICE_COLOR, dash: false }],
+    // One line per home_type, all sharing this one y scale (drawMiniChart
+    // derives its y domain from every series passed in together) - that's
+    // what makes the two lines directly comparable rather than each
+    // getting its own independently-scaled axis. All but the first are
+    // dashed - most counties' home_type series track each other so closely
+    // (condos are a small share of most counties' housing stock) that two
+    // solid lines of different colors land on nearly the same pixels; a
+    // dash pattern stays visually distinct even at near-total overlap.
+    series: homeTypes.map((ht, i) => ({ values: zhviSeriesByType[ht], color: homeTypeColor(ht), dash: i > 0 })),
   });
 
   drawMiniChart("detail-svg-income", {
@@ -1055,7 +1187,7 @@ function renderDetail() {
   });
 
   renderDetailMarker();
-  renderDetailLegend(estimatedYears.size > 0);
+  renderDetailLegend(homeTypes, estimatedYears.size > 0);
 }
 
 // Draws one of the three stacked mini-charts: a single y-axis, one or more
@@ -1129,13 +1261,17 @@ function renderDetailMarker() {
   d3.selectAll(".detail-marker").attr("x1", xPos).attr("x2", xPos);
 }
 
-function renderDetailLegend(hasEstimatedYears) {
+function renderDetailLegend(homeTypes, hasEstimatedYears) {
   const el = document.getElementById("detail-legend");
   el.innerHTML = "";
   const rows = [
-    { color: PRICE_COLOR, dash: false, label: "Home value (ZHVI, $)" },
-    { color: INCOME_COLOR, dash: true, label: "Per-capita income ($/yr)" },
-    { color: RATIO_COLOR, dash: false, label: "Price / income ratio" },
+    ...homeTypes.map((ht, i) => ({
+      color: homeTypeColor(ht),
+      dash: i > 0, // matches the price chart's own dashing - see renderDetail
+      label: `Home value (ZHVI, ${homeTypeLabel(ht)}, $)`,
+    })),
+    { color: INCOME_COLOR, dash: true, label: "Mean per-capita income ($/yr)" },
+    { color: RATIO_COLOR, dash: false, label: "Price / mean per-capita income ratio" },
   ];
   if (hasEstimatedYears) {
     rows.push({

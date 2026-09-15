@@ -6,16 +6,22 @@
 #   - zhvi: {home_type: counties x months matrix of home values (null where
 #     missing)} - one matrix per Zillow home-value series (see zillow_paths
 #     below), so the client can switch between them
-#   - income: counties x months matrix of income (same shape as one zhvi
-#     matrix) - already interpolated month-by-month in build_income.py, not a
-#     flat per-year value, so the client doesn't need any year-level logic.
-#     Not home_type-specific - income is the same series regardless of which
-#     Zillow home-value series it's being compared against.
+#   - income: counties x months matrix of per-capita income (same shape as
+#     one zhvi matrix) - already interpolated month-by-month in
+#     build_income.py, not a flat per-year value, so the client doesn't need
+#     any year-level logic. Not home_type-specific - income is the same
+#     series regardless of which Zillow home-value series it's being
+#     compared against.
 #   - incomeEstimatedYears: {fips: [year, ...]} - years whose income_est is
 #     extrapolated from a QCEW growth rate rather than a real FRED figure
 #     (income_source starts with "fred_estimated_"), so the client can flag
 #     that portion of the income line rather than presenting it as identical
 #     to a real published figure
+#   - householdIncome / householdIncomeEstimatedYears: same shape/purpose as
+#     income / incomeEstimatedYears, but for median HOUSEHOLD income (Census
+#     SAIPE, see build_income.py) rather than per-capita - a second,
+#     independent metric/ratio basis in the client, not a replacement for
+#     the per-capita figures above.
 #
 # Run after build_income.py / create_output.py (or standalone - it only
 # needs the Zillow CSVs and outputs/income_combined.csv).
@@ -76,7 +82,10 @@ for home_type, zillow in zillow_frames.items():
         for row in zillow[date_cols].itertuples(index=False)
     ]
 
-income = pd.read_csv(income_path, dtype={"fips": str})
+income = pd.read_csv(
+    income_path,
+    dtype={"fips": str, "income_source": str, "household_income_source": str},
+)
 income["fips"] = income["fips"].str.zfill(5)
 income["year_month"] = income["year"].astype(str) + "-" + income["month"].astype(str).str.zfill(2)
 
@@ -89,19 +98,30 @@ income_matrix = [
     [round_or_none(v) for v in row] for row in income_pivot.itertuples(index=False)
 ]
 
-estimated = income[income["income_source"].str.startswith("fred_estimated_")]
-estimated_years_by_fips = (
-    estimated.groupby("fips")["year"]
-    .apply(lambda years: sorted(int(y) for y in years.unique()))
-    .to_dict()
-)
+def estimated_years_by_fips(frame, source_col, prefix):
+    estimated = frame[frame[source_col].str.startswith(prefix, na=False)]
+    return (
+        estimated.groupby("fips")["year"]
+        .apply(lambda years: sorted(int(y) for y in years.unique()))
+        .to_dict()
+    )
+
+household_pivot = income.pivot(index="fips", columns="year_month", values="household_income_est")
+household_pivot = household_pivot.reindex(index=[c["fips"] for c in counties], columns=months)
+household_income_matrix = [
+    [round_or_none(v) for v in row] for row in household_pivot.itertuples(index=False)
+]
 
 dataset = {
     "months": months,
     "counties": counties,
     "zhvi": zhvi_matrices,
     "income": income_matrix,
-    "incomeEstimatedYears": estimated_years_by_fips,
+    "incomeEstimatedYears": estimated_years_by_fips(income, "income_source", "fred_estimated_"),
+    "householdIncome": household_income_matrix,
+    "householdIncomeEstimatedYears": estimated_years_by_fips(
+        income, "household_income_source", "saipe_estimated_"
+    ),
 }
 
 with open(output_path, "w") as f:

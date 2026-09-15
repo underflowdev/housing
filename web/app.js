@@ -1039,6 +1039,7 @@ function addStatCard(container, title, items, showState) {
 
 const PRICE_COLOR = "#2b6cb0";
 const INCOME_COLOR = "#d69e2e";
+const HOUSEHOLD_INCOME_COLOR = "#c53030";
 const RATIO_COLOR = "#2c7a7b";
 // Home-value chart shows one line per available home_type (see renderDetail)
 // rather than just the one the map's home-type toggle currently selects -
@@ -1097,24 +1098,36 @@ function renderDetail() {
   homeTypes.forEach((ht) => {
     zhviSeriesByType[ht] = months.map((m, i) => data.zhvi[ht][entry.index][i]);
   });
-  // Ratio and the ratio/income charts below still use the map's currently
-  // selected home_type - only the price chart itself shows all of them.
+  // Ratio and the price/ratio comparison below still use the map's
+  // currently selected home_type - only the price chart itself shows all
+  // of them. Ratio also stays fixed to per-capita income specifically
+  // (like the map's own ratio-basis toggle default), even though the
+  // income chart right below it now shows both measures.
   const zhviSeries = zhviSeriesByType[state.homeType];
   const incomeSeries = months.map((m, i) => data.income[entry.index][i]);
+  const householdIncomeSeries = months.map((m, i) => data.householdIncome[entry.index][i]);
   const ratioSeries = months.map((m, i) =>
     zhviSeries[i] != null && incomeSeries[i] != null ? zhviSeries[i] / incomeSeries[i] : null
   );
 
-  // Years extrapolated from a QCEW growth rate rather than a real published
-  // FRED figure - flagged so the charts don't present an estimate as if it
-  // were identical to real data (see build_income.py / web_data_build.py).
-  // The ratio inherits the same flag wherever it depends on an estimated
-  // income figure.
+  // Years extrapolated from a growth rate rather than a real published
+  // figure - flagged so the charts don't present an estimate as if it were
+  // identical to real data (see build_income.py / web_data_build.py). Each
+  // income measure has its own estimated-years set (they lag differently),
+  // so each gets its own isEstimated/lastRealIndex. The ratio chart below
+  // inherits per-capita's flag specifically, since it's a per-capita ratio.
   const estimatedYears = new Set(data.incomeEstimatedYears[state.countyFips] || []);
   const isEstimated = (i) => estimatedYears.has(+months[i].slice(0, 4));
   let lastRealIndex = -1;
   for (let i = 0; i < months.length; i++) {
     if (incomeSeries[i] != null && !isEstimated(i)) lastRealIndex = i;
+  }
+
+  const householdEstimatedYears = new Set(data.householdIncomeEstimatedYears[state.countyFips] || []);
+  const isHouseholdEstimated = (i) => householdEstimatedYears.has(+months[i].slice(0, 4));
+  let lastRealHouseholdIndex = -1;
+  for (let i = 0; i < months.length; i++) {
+    if (householdIncomeSeries[i] != null && !isHouseholdEstimated(i)) lastRealHouseholdIndex = i;
   }
 
   // All three charts share this width/margin, so one x scale (stashed in
@@ -1143,6 +1156,14 @@ function renderDetail() {
     series: homeTypes.map((ht, i) => ({ values: zhviSeriesByType[ht], color: homeTypeColor(ht), dash: i > 0 })),
   });
 
+  // Same shared-scale approach as the price chart above: both income
+  // measures plotted together so drawMiniChart derives one y domain from
+  // both, rather than each getting an independently-scaled axis. Expect
+  // (and it's fine if) the gap between them is much larger than
+  // home-value's all_homes/single_family gap was - that's the point of
+  // putting them on one scale, to see the size of that gap directly rather
+  // than comparing two separately-scaled charts by eye.
+  document.getElementById("detail-income-title").textContent = "Income ($/yr)";
   drawMiniChart("detail-svg-income", {
     width,
     margin,
@@ -1151,15 +1172,29 @@ function renderDetail() {
     showXAxis: false,
     yFormat: (d) => "$" + d3.format(".2s")(d),
     series: [
-      { values: incomeSeries, color: INCOME_COLOR, dash: true, defined: (i) => incomeSeries[i] != null && !isEstimated(i) },
+      { values: incomeSeries, color: INCOME_COLOR, dash: false, defined: (i) => incomeSeries[i] != null && !isEstimated(i) },
       {
         values: incomeSeries,
         color: INCOME_COLOR,
-        dash: true,
+        dash: false,
         faint: true,
         // Overlaps the real line's last point so the estimated tail
         // connects visually instead of leaving a gap.
         defined: (i) => incomeSeries[i] != null && (isEstimated(i) || i === lastRealIndex),
+      },
+      {
+        values: householdIncomeSeries,
+        color: HOUSEHOLD_INCOME_COLOR,
+        dash: true,
+        defined: (i) => householdIncomeSeries[i] != null && !isHouseholdEstimated(i),
+      },
+      {
+        values: householdIncomeSeries,
+        color: HOUSEHOLD_INCOME_COLOR,
+        dash: true,
+        faint: true,
+        defined: (i) =>
+          householdIncomeSeries[i] != null && (isHouseholdEstimated(i) || i === lastRealHouseholdIndex),
       },
     ],
   });
@@ -1187,7 +1222,7 @@ function renderDetail() {
   });
 
   renderDetailMarker();
-  renderDetailLegend(homeTypes, estimatedYears.size > 0);
+  renderDetailLegend(homeTypes, estimatedYears.size > 0, householdEstimatedYears.size > 0);
 }
 
 // Draws one of the three stacked mini-charts: a single y-axis, one or more
@@ -1261,7 +1296,7 @@ function renderDetailMarker() {
   d3.selectAll(".detail-marker").attr("x1", xPos).attr("x2", xPos);
 }
 
-function renderDetailLegend(homeTypes, hasEstimatedYears) {
+function renderDetailLegend(homeTypes, hasEstimatedYears, hasHouseholdEstimatedYears) {
   const el = document.getElementById("detail-legend");
   el.innerHTML = "";
   const rows = [
@@ -1270,15 +1305,27 @@ function renderDetailLegend(homeTypes, hasEstimatedYears) {
       dash: i > 0, // matches the price chart's own dashing - see renderDetail
       label: `Home value (ZHVI, ${homeTypeLabel(ht)}, $)`,
     })),
-    { color: INCOME_COLOR, dash: true, label: "Mean per-capita income ($/yr)" },
+    // Solid/dashed here matches the income chart's own dashing (see
+    // renderDetail) - same "first solid, rest dashed" convention as the
+    // home-value lines above, now that both income measures share one chart.
+    { color: INCOME_COLOR, dash: false, label: "Mean per-capita income ($/yr)" },
+    { color: HOUSEHOLD_INCOME_COLOR, dash: true, label: "Median household income ($/yr)" },
     { color: RATIO_COLOR, dash: false, label: "Price / mean per-capita income ratio" },
   ];
   if (hasEstimatedYears) {
     rows.push({
       color: INCOME_COLOR,
+      dash: false,
+      faint: true,
+      label: "Per-capita income & ratio, estimated (no published figure yet)",
+    });
+  }
+  if (hasHouseholdEstimatedYears) {
+    rows.push({
+      color: HOUSEHOLD_INCOME_COLOR,
       dash: true,
       faint: true,
-      label: "Income & ratio, estimated (no published income figure yet)",
+      label: "Household income, estimated (no published figure yet)",
     });
   }
   rows.forEach((r) => {

@@ -95,12 +95,13 @@ Promise.all([
     const fullName = f.properties && f.properties.name ? f.properties.name : f.id;
     statesByFips.set(f.id, { abbr: anyCounty ? anyCounty.state : f.id, name: fullName, geo: f });
   });
-  // The map (TopoJSON) has every US county; Zillow's dataset - and so
-  // byFips - only has the ~3,071 it reports ZHVI for. A handful of small
-  // counties (e.g. Jackson County, CO) are on the map but have no Zillow
-  // data at all, so byFips has nothing for them. This fallback name/state
-  // lookup covers every county on the map, so those still display
-  // sensibly instead of silently failing wherever byFips is checked.
+  // The map (TopoJSON) has every US county; the dataset - and so byFips -
+  // only has counties with Zillow or income data (see web_data_build.py).
+  // A few map counties have neither (e.g. Kalawao County, HI, or Kusilvak
+  // Census Area, AK, whose income is reported under its retired FIPS code),
+  // so byFips has nothing for them. This fallback name/state lookup covers every county on the
+  // map, so those still display sensibly instead of silently failing
+  // wherever byFips is checked.
   nationGeo.features.forEach((f) => {
     if (!countyNameByFips.has(f.id)) {
       const stateAbbr = statesByFips.get(f.id.slice(0, 2));
@@ -875,7 +876,7 @@ function countyTooltip(fips) {
 function selectCounty(fips) {
   state.countyFips = fips;
   // Derive from the FIPS itself (first 2 digits = state), not from
-  // byFips - a county Zillow doesn't cover (e.g. Jackson County, CO)
+  // byFips - a county with no data (e.g. Kalawao County, HI)
   // still has a real state and should still navigate there correctly.
   state.stateFips = fips.slice(0, 2);
   state.view = "state";
@@ -941,8 +942,9 @@ function renderSummaryStatCards(el, rows, avgLabel, totalCount, showState) {
   ].map((card) => ({ ...card, rows: rows.filter((r) => r[card.key] != null) }));
 
   // Per-measure counts, since they differ a lot - rent (ZORI) covers far
-  // fewer counties than home values, and income lags the latest months -
-  // so an average over 40 counties isn't mistaken for one over 3,000.
+  // fewer counties than home values, home values thin out in early years,
+  // and income covers some small counties Zillow doesn't - so an average
+  // over 40 counties isn't mistaken for one over 3,000.
   addStatCard(
     el,
     "Counties with data this month",
@@ -967,8 +969,8 @@ function renderStateSummary() {
   document.getElementById("overview-title").textContent = stateName(state.stateFips) + " overview";
   const rows = countyStatsRows((c) => c.fips.slice(0, 2) === state.stateFips);
   // Total counties in this state per the map (every real county), not per
-  // Zillow's list - Zillow doesn't cover every county (e.g. Jackson County,
-  // CO), so using data.counties.length as the denominator understated the
+  // data.counties - not every county has data (e.g. Kalawao County, HI),
+  // so using data.counties.length as the denominator understated the
   // true gap and could read as "100% coverage" when it wasn't.
   const totalCount = nationGeo.features.filter((f) => f.id.slice(0, 2) === state.stateFips).length;
   renderSummaryStatCards(document.getElementById("overview-stats"), rows, "State average", totalCount, false);
@@ -1071,7 +1073,7 @@ function renderDetail() {
   const chartsEl = document.getElementById("detail-charts");
   const legendEl = document.getElementById("detail-legend");
   if (!entry) {
-    // Zillow doesn't cover every county (e.g. Jackson County, CO) - say so
+    // A county with neither Zillow nor income data - say so
     // plainly instead of leaving the charts blank or showing a stale
     // previous county's data.
     noDataEl.hidden = false;

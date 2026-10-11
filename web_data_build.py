@@ -2,7 +2,8 @@
 # existing pipeline outputs (Zillow + income_combined.csv). Ships one JSON
 # file the client loads once:
 #   - months: ordered ["YYYY-MM", ...] covering Zillow's full range
-#   - counties: [{fips, name, state}, ...]
+#   - counties: [{fips, name, state}, ...] - Zillow's counties plus
+#     income-only ones (see below), so a zhvi/rent row can be all null
 #   - zhvi: {home_type: counties x months matrix of home values (null where
 #     missing)} - one matrix per Zillow home-value series (see zillow_paths
 #     below), so the client can switch between them
@@ -49,6 +50,7 @@ zillow_paths = {
 zillow_rent_path = "./data/zillow/rentals-all-homes/County_zori_uc_sfrcondomfr_sm_month.csv"
 income_path = "./outputs/income_combined.csv"
 geo_path = "./data/geo/counties-10m.json"
+nrcs_path = "./data/nrcs/nrcs_fips_codes.csv"
 output_path = "./web/data/dataset.json"
 geo_output_path = "./web/data/counties-10m.json"
 
@@ -75,10 +77,36 @@ for home_type, zillow_path in zillow_paths.items():
 date_cols = sorted([c for c in zillow_frames[first_home_type].columns if DATE_COL_RE.match(c)])
 months = [c[:7] for c in date_cols]  # "YYYY-MM-DD" -> "YYYY-MM"
 
+income = pd.read_csv(
+    income_path,
+    dtype={"fips": str, "income_source": str, "household_income_source": str},
+)
+income["fips"] = income["fips"].str.zfill(5)
+income["year_month"] = income["year"].astype(str) + "-" + income["month"].astype(str).str.zfill(2)
+
+# County list = Zillow's counties plus any county with income data but no
+# Zillow row (67 small rural counties, e.g. Jackson County, CO), so the
+# client can show income for them and its coverage counts aren't capped at
+# Zillow's list. Income-only counties are limited to ones on the map, which
+# drops retired FIPS codes (e.g. Shannon County, SD -> Oglala Lakota) that
+# FRED/SAIPE still report history under. Names come from the NRCS crosswalk.
+with open(geo_path) as f:
+    map_fips = {g["id"] for g in json.load(f)["objects"]["counties"]["geometries"]}
+nrcs = pd.read_csv(nrcs_path, dtype=str).set_index("nrcs_fips")
 counties = [
     {"fips": row.fips, "name": row.RegionName, "state": row.StateName}
     for row in zillow_frames[first_home_type].itertuples()
 ]
+zillow_fips = {c["fips"] for c in counties}
+has_income = income[["income_est", "household_income_est"]].notna().any(axis=1)
+income_only_fips = sorted(
+    set(income.loc[has_income, "fips"]) - zillow_fips & map_fips & set(nrcs.index)
+)
+counties += [
+    {"fips": fips, "name": nrcs.at[fips, "nrcs_county"], "state": nrcs.at[fips, "nrcs_abbr"]}
+    for fips in income_only_fips
+]
+counties.sort(key=lambda c: c["fips"])
 
 zhvi_matrices = {}
 for home_type, zillow in zillow_frames.items():
@@ -102,13 +130,6 @@ if zillow_rent_path:
     rent = rent.set_index("fips")[rent_date_cols].rename(columns=lambda c: c[:7])
     rent = rent.reindex(index=[c["fips"] for c in counties], columns=months)
     rent_matrix = [[round_or_none(v) for v in row] for row in rent.itertuples(index=False)]
-
-income = pd.read_csv(
-    income_path,
-    dtype={"fips": str, "income_source": str, "household_income_source": str},
-)
-income["fips"] = income["fips"].str.zfill(5)
-income["year_month"] = income["year"].astype(str) + "-" + income["month"].astype(str).str.zfill(2)
 
 # One row per (fips, year_month) already (see build_income.py), so this
 # pivot is exact - no aggregation needed, just reshaping.

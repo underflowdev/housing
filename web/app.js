@@ -26,8 +26,8 @@ let countyNameByFips = new Map(); // fips -> {name, state} - every county in the
 let statesByFips = new Map(); // 2-digit fips -> { abbr, geo }
 // Ratio is inherently a relative measure, so its scale is fixed once
 // (computed across all counties/months) and stays comparable at every point
-// on the timeline. Price and income are nominal dollar figures that trend
-// up over the ~25yr range (appreciation/inflation), so a scale fixed like
+// on the timeline. Housing prices (home value or rent) and income are
+// nominal dollar figures that trend up over the ~25yr range (appreciation/inflation), so a scale fixed like
 // ratio's would leave early months uniformly dim and late months uniformly
 // bright - those get a month-relative scale instead (see
 // monthColorScaleCache below).

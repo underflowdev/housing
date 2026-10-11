@@ -312,6 +312,22 @@ body {
   text-decoration: underline;
 }
 
+/* Not .legend-title: a collapsed .collapsible box keeps its .legend-title
+   visible, and only the box's own "Data sources" title should survive. */
+.sources-legend .notes-title {
+  font-weight: 600;
+  margin: 0.6rem 0 0.2rem;
+}
+
+.sources-legend .notes-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.sources-legend .notes-list li + li {
+  margin-top: 0.15rem;
+}
+
 .legend-title {
   font-weight: 600;
   margin-bottom: 0.3rem;

@@ -1,9 +1,9 @@
 # housing vs income
 
-A small Python pipeline that joins Zillow home-value data with FRED income
+A small Python pipeline that joins Zillow home-value and rent data with FRED income
 data — per-capita personal income, and median household income via Census
 SAIPE — at the US county level, producing a single tidy CSV (one row per
-county-month) suitable for visualization of home-price-to-income ratios over
+county-month) suitable for visualization of housing-price-to-income ratios over
 time, on either income basis. There's also a static web app (`web/`) that
 renders the result as an interactive choropleth.
 

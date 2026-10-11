@@ -5,9 +5,9 @@ import time
 
 import requests
 
-# Fetches state- and national-level REAL median household income
-# (Census/CPS ASEC, mirrored by FRED as release 249: "Real Median Household
-# Income by State, Annual") - not for output directly, but as the growth
+# Fetches state- and national-level NOMINAL (current-dollar) median
+# household income (Census/CPS ASEC, mirrored by FRED as release 249) - not
+# for output directly, but as the growth
 # RATE build_income.py's household-income branch uses to extrapolate each
 # county's last known SAIPE figure into years SAIPE hasn't published yet
 # (SAIPE lags similarly to BEA's per-capita release - see CLAUDE.md). This
@@ -15,6 +15,9 @@ import requests
 # used for per-capita income, but using an actual household-income measure
 # as the rate source instead of QCEW's per-job average weekly wage, so it
 # doesn't carry the same per-job-vs-per-household methodology-break caveat.
+# Nominal (A646N), not real (A672N, constant dollars): the SAIPE levels the
+# rate gets applied to are nominal, so a real rate would understate each
+# estimated year's growth by that year's inflation.
 #
 # Only 51 series total (50 states + DC) plus 1 national - small enough to
 # always fetch in full, no --states/--limit narrowing needed.
@@ -36,7 +39,7 @@ state_abbrs = [
 # fmt: on
 
 parser = argparse.ArgumentParser(
-    description="Fetch state/national real median household income growth-rate series from FRED."
+    description="Fetch state/national nominal median household income growth-rate series from FRED."
 )
 parser.add_argument("--start-year", type=int, default=2000)
 parser.add_argument("--force", action="store_true")
@@ -53,9 +56,9 @@ payload = {
 REQUEST_DELAY_SECONDS = 2  # same host as fred_fetch.py/fred_household_fetch.py
 
 # "US" (national) plus every state abbr; series id is
-# MEHOINUS<abbr>A672N, national is just MEHOINUSA672N (no abbr segment).
-targets = [("US", "MEHOINUSA672N")] + [
-    (abbr, f"MEHOINUS{abbr}A672N") for abbr in state_abbrs
+# MEHOINUS<abbr>A646N, national is just MEHOINUSA646N (no abbr segment).
+targets = [("US", "MEHOINUSA646N")] + [
+    (abbr, f"MEHOINUS{abbr}A646N") for abbr in state_abbrs
 ]
 
 for abbr, series_id in targets:

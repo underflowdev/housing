@@ -16,15 +16,22 @@
 # is extrapolated forward from each county's last real figure using a growth
 # RATE (not a level) taken from a faster-published source of the SAME
 # measure where possible:
-#   - per-capita income: QCEW real average-weekly-wage rate (county, else
-#     state, else national) - a different measure (per-job wages, not
-#     per-resident income), so this is a rate transfer only, not a level
-#     splice (see the QCEW section in CLAUDE.md for why mixing levels
-#     directly would be a methodology break).
-#   - household income: real median household income rate from FRED release
-#     249 (state, else national - no faster county-level source exists for
-#     this measure) - the SAME measure as SAIPE, just less granular for the
-#     most recent year, so no per-job-vs-per-household mismatch to flag.
+#   - per-capita income: QCEW average-weekly-wage rate (state, else
+#     national) - a different measure (per-job wages, not per-resident
+#     income), so this is a rate transfer only, not a level splice (see the
+#     QCEW section in CLAUDE.md for why mixing levels directly would be a
+#     methodology break). Deliberately NOT the county's own QCEW rate:
+#     backtested against 2016-2024 real figures, single-county wage growth
+#     barely correlates with county income growth (r ~0.0-0.2) and its noise
+#     made estimates worse than a state rate every year.
+#   - household income: nominal (current-dollar) median household income
+#     rate from FRED release 249 (state, else national - no faster
+#     county-level source exists for this measure) - the same concept as
+#     SAIPE, just less granular for the most recent year, so no
+#     per-job-vs-per-household mismatch to flag. Must be the nominal series
+#     (A646N), not the real one (A672N): SAIPE levels are nominal, so a real
+#     rate would drop inflation every estimated year.
+# All of these are nominal, matching the nominal FRED/SAIPE levels.
 # The interpolation happens after extrapolation, so estimated years become
 # anchors too.
 #
@@ -174,7 +181,6 @@ if qcew_files:
     fips_to_abbr = dict(zip(fips["nrcs_fips"].str[:2], fips["nrcs_abbr"]))
     qcew["state_abbr"] = qcew["fips"].map(lambda f: fips_to_abbr.get(f[:2]))
 
-    county_wage = qcew.set_index(["fips", "year", "qtr"])["avg_wkly_wage"].to_dict()
     state_wage = (
         qcew.groupby(["state_abbr", "year", "qtr"])["avg_wkly_wage"].mean().to_dict()
     )
@@ -208,10 +214,7 @@ if qcew_files:
 
             state_abbr = fips_to_state.get(county_fips)
             rate, source = None, None
-            r = qcew_annual_rate(county_wage, (county_fips,), base_year, target_year)
-            if r is not None:
-                rate, source = r, "fred_estimated_county_qcew_rate"
-            elif state_abbr is not None:
+            if state_abbr is not None:
                 r = qcew_annual_rate(state_wage, (state_abbr,), base_year, target_year)
                 if r is not None:
                     rate, source = r, "fred_estimated_state_qcew_rate"
@@ -264,20 +267,19 @@ for saipe_file in glob.glob(os.path.join(fred_household_dir, "*.json")):
 household = pd.DataFrame(household_rows)
 
 # --- extrapolate years beyond SAIPE's coverage. Primary source is the
-# --- state/national real-median-household-income growth rate (release 249)
-# --- - the same measure SAIPE itself is, just less granular, so (unlike the
-# --- QCEW fallback below) there's no per-job-vs-per-household mismatch to
-# --- flag. But it comes from the same underlying survey (CPS ASEC) as
-# --- SAIPE, so it can lag just as far behind - e.g. as of writing, both cap
-# --- at 2024 because the "Income in the United States: 2025" release
-# --- (which would carry a 2025 rate) hasn't happened yet. For years beyond
-# --- release 249's own coverage too, fall back to QCEW's real
-# --- average-weekly-wage rate (county, else state, else national) - the
+# --- state/national nominal median-household-income growth rate (release
+# --- 249, Census CPS ASEC) - the same concept SAIPE itself estimates, just
+# --- less granular, so (unlike the QCEW fallback below) there's no
+# --- per-job-vs-per-household mismatch to flag. It's published annually
+# --- (each September) only a few months ahead of SAIPE (each December), so
+# --- it often has no year SAIPE lacks. For years beyond release 249's own
+# --- coverage too, fall back to QCEW's nominal
+# --- average-weekly-wage rate (state, else national) - the
 # --- SAME proxy already used for per-capita income above, and it carries
 # --- the SAME caveat (per-job wages, not per-household income - a rate
 # --- transfer, not a level splice), tagged distinctly
 # --- (household_income_source ending "_qcew_wage_rate") so it's never
-# --- mistaken for the real-measure ACS-rate estimate above it in the
+# --- mistaken for the same-measure CPS-rate estimate above it in the
 # --- fallback order.
 
 growth_files = glob.glob(os.path.join(fred_household_growth_dir, "*.json"))
@@ -329,23 +331,20 @@ if growth_files or qcew_files:
             if state_abbr is not None:
                 r = growth_rate(state_abbr, base_year, target_year)
                 if r is not None:
-                    rate, source = r, "saipe_estimated_state_acs_rate"
+                    rate, source = r, "saipe_estimated_state_cps_rate"
             if rate is None:
                 r = growth_rate("US", base_year, target_year)
                 if r is not None:
-                    rate, source = r, "saipe_estimated_national_acs_rate"
+                    rate, source = r, "saipe_estimated_national_cps_rate"
 
-            # Neither ACS-rate tier has this year yet (release 249 lags just
-            # as far behind as SAIPE itself, since both come from the same
-            # CPS ASEC survey) - fall back to QCEW's wage rate, same proxy
+            # Neither CPS-rate tier has this year yet (release 249 is
+            # annual and often no further ahead than SAIPE) - fall back to
+            # QCEW's wage rate, same proxy
             # and same rate-transfer-not-level-splice caveat as per-capita's
             # QCEW fallback above, tagged distinctly so it reads as a
-            # rougher, cross-measure estimate rather than a real ACS rate.
+            # rougher, cross-measure estimate rather than a CPS rate.
             if rate is None and qcew_files:
-                r = qcew_annual_rate(county_wage, (county_fips,), base_year, target_year)
-                if r is not None:
-                    rate, source = r, "saipe_estimated_county_qcew_wage_rate"
-                elif state_abbr is not None:
+                if state_abbr is not None:
                     r = qcew_annual_rate(state_wage, (state_abbr,), base_year, target_year)
                     if r is not None:
                         rate, source = r, "saipe_estimated_state_qcew_wage_rate"

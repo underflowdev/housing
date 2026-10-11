@@ -6,6 +6,5 @@ fred_key.txt
 data/qcew/qcew_*.csv
 data/fred/*.json
 data/fred_household/*.json
-data/fred_household_growth/*.json
 web/data/*.json
 scripts/deploy.env

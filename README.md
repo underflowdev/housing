@@ -50,7 +50,6 @@ python fred_fetch.py --start-year 2024 --end-year 2025 --force
 
 ```
 python fred_household_fetch.py
-python fred_household_growth_fetch.py
 ```
 
 `fred_household_fetch.py` pulls median household income (Census SAIPE, mirrored
@@ -60,10 +59,8 @@ per county (its whole history in one call, back to `--start-year`, default
 per-capita fetch above. A full run is ~3,150 counties at the same 2s delay, so
 also budget a while for this one (~1.5-2 hours from empty); it skips counties
 it's already fetched, so it's safe to re-run after an interruption.
-`fred_household_growth_fetch.py` pulls a much smaller companion dataset — real
-median household income by state and nationally (FRED release 249, ~51
-series) — that `build_income.py` uses to extrapolate SAIPE into years it
-hasn't published yet, the same role QCEW plays for per-capita income below.
+Years SAIPE hasn't published yet are extrapolated from QCEW wage growth, the
+same as per-capita income (see below).
 
 ## 4. Fetch QCEW wage data (optional, but recommended)
 
@@ -76,10 +73,13 @@ pulls BLS QCEW's quarterly average-weekly-wage data (2014 Q1 onward — earlier
 quarters aren't available via this API) into `data/qcew/qcew_<year>_q<qtr>.csv`,
 one request per year/quarter covering every county nationwide. `build_income.py`
 uses the year-over-year change in this data as a growth rate to extrapolate
-each county's last known FRED figure into the years FRED hasn't published yet.
+each county's last known FRED/SAIPE figure into the years they haven't
+published yet, using the state's rate (median of its counties' rates), else
+the national one.
 Use `--limit N` for a quick test, `--start-year`/`--end-year` to narrow the
 range. If you skip this step, `build_income.py` still runs fine — those recent
-years are simply left blank instead of estimated.
+years are held flat at each county's last published value instead of
+estimated.
 
 ## 5. Download the Zillow data (manual step)
 
@@ -108,8 +108,7 @@ python build_income.py && python create_output.py
   fips-keyed monthly table: per-capita income (interpolating FRED's annual
   figures into a smooth monthly series, extrapolating years FRED hasn't
   published yet using BLS QCEW wage growth rates) and median household
-  income (same interpolation, extrapolated using the release-249
-  growth rate fetched in step 3). Writes `outputs/income_combined.csv`.
+  income (same interpolation and the same QCEW-based extrapolation). Writes `outputs/income_combined.csv`.
 - `create_output.py` merges that with each configured Zillow file on
   `(fips, year, month)`. Writes `outputs/fips_zillow_income.csv` — the final
   tidy output, one row per county-month-home_type (see `home_type` column)

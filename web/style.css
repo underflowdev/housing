@@ -217,13 +217,6 @@ body {
   display: block;
 }
 
-/* The price chart now plots one line per home_type on a shared y scale
-   (see renderDetail in app.js) - all_homes and single_family often track
-   closely, so a bit more vertical room helps keep them visually distinct. */
-#detail-svg-price {
-  height: 150px;
-}
-
 /* Overrides the inline stroke="#999" set in drawMiniChart() - a CSS rule
    beats a presentation attribute regardless of specificity, so this wins
    without touching the JS. */
@@ -324,12 +317,27 @@ body {
   margin-bottom: 0.3rem;
 }
 
+/* One labeled group per choice - housing measure, income measure, and
+   which of housing / income / their ratio the map shows - so the three
+   independent selections read as three separate questions. */
 #toggle-row {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 0.4rem;
-  margin-bottom: 0.5rem;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.6rem;
+}
+
+.toggle-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.toggle-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
 }
 
 .metric-toggle {
@@ -408,9 +416,12 @@ body {
 /* One card per stat (coverage, home value, income, ratio) instead of one
    box holding all of them - each is its own flex item here so they can
    wrap freely, rather than being nested inside a single wrapping box. */
+/* Grid rather than wrapping flex, so a card count that doesn't fill the
+   last row (e.g. the rent cards, which only appear when ZORI covers the
+   month) leaves an even column rather than one card stretched full-width. */
 #overview-stats {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
   gap: 0.6rem;
 }
 
@@ -599,10 +610,10 @@ body {
     flex-basis: 100%;
   }
 
-  /* .stat-card's flex-basis: 200px lets two fit per row around this
-     width, giving an awkward 2x2 grid instead of a clean single-column
-     stack - force full width instead. */
-  #overview-stats .stat-card {
-    flex-basis: 100%;
+  /* The 175px grid minimum lets two cards fit per row around this width,
+     giving an awkward 2-column grid instead of a clean single-column
+     stack - force one column instead. */
+  #overview-stats {
+    grid-template-columns: 1fr;
   }
 }

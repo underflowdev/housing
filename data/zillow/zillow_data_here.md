@@ -7,3 +7,11 @@ data/zillow/single-family-homes/County_zhvi_uc_sfr_tier_0.33_0.67_sm_sa_mon_2105
 `create_output.py` and `web_data_build.py` both read from a `zillow_paths`
 dict keyed by home_type (`all_homes`, `single_family`, ...) - update those
 dicts (marked `# UPDATE:`) to match the files/folders you've downloaded.
+
+Rent (ZORI, Zillow Observed Rent Index) goes in its own folder, e.g.:
+
+data/zillow/rentals-all-homes/County_zori_uc_sfrcondomfr_sm_month.csv
+
+It's configured separately from the home-value files - `zillow_rent_path`
+(also marked `# UPDATE:`) in both scripts - since it's monthly rent, not a
+home value.

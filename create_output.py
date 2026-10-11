@@ -25,6 +25,12 @@ zillow_paths = {
     "all_homes": "./data/zillow/all-homes/County_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv",
     "single_family": "./data/zillow/single-family-homes/County_zhvi_uc_sfr_tier_0.33_0.67_sm_sa_month.csv",
 }
+# UPDATE:
+# Zillow Observed Rent Index (ZORI) county file. Monthly typical asking rent
+# ($/mo), not a home value, so it's not a home_type entry above - it's
+# joined onto every home_type's rows as its own zori column (rent doesn't
+# depend on which home-value series a row is for). Set to None to skip.
+zillow_rent_path = "./data/zillow/rentals-all-homes/County_zori_uc_sfrcondomfr_sm_month.csv"
 income_path = "./outputs/income_combined.csv"
 final_output_path = "./outputs/fips_zillow_income.csv"
 
@@ -60,11 +66,33 @@ zillow_long["month"] = zillow_long["date"].dt.month
 # global timestamp (e.g. a choropleth's time slider), rather than parsing "date".
 zillow_long["year_month"] = zillow_long["date"].dt.strftime("%Y-%m")
 
-# --- income: pre-combined by build_income.py, monthly (fips, year, month, income_est, income_source) ---
+# --- Zillow rent (ZORI): same wide layout as ZHVI -> long (fips, year, month, zori) ---
+# Much thinner coverage than ZHVI (~1,400 counties, most only from recent
+# years; series start 2015 at the earliest), so zori is blank for most rows.
+
+if zillow_rent_path:
+    rent = pd.read_csv(zillow_rent_path, dtype={"StateCodeFIPS": str, "MunicipalCodeFIPS": str}).copy()
+    rent["fips"] = rent["StateCodeFIPS"].str.zfill(2) + rent["MunicipalCodeFIPS"].str.zfill(3)
+    rent_date_cols = [c for c in rent.columns if DATE_COL_RE.match(c)]
+    rent_long = rent[["fips"] + rent_date_cols].melt(id_vars=["fips"], var_name="date", value_name="zori")
+    rent_long["date"] = pd.to_datetime(rent_long["date"])
+    rent_long["year"] = rent_long["date"].dt.year
+    rent_long["month"] = rent_long["date"].dt.month
+    zillow_long = pd.merge(
+        zillow_long, rent_long[["fips", "year", "month", "zori"]], on=["fips", "year", "month"], how="left"
+    )
+else:
+    zillow_long["zori"] = float("nan")
+
+# --- income: pre-combined by build_income.py, monthly (fips, year, month,
+# --- income_est, income_source, household_income_est, household_income_source) ---
 # Already interpolated between annual anchors - see build_income.py - so
 # this is a genuine month-by-month income series, not a flat per-year value.
 
-income = pd.read_csv(income_path, dtype={"fips": str})
+income = pd.read_csv(
+    income_path,
+    dtype={"fips": str, "income_source": str, "household_income_source": str},
+)
 income["fips"] = income["fips"].str.zfill(5)
 
 # --- merge on (fips, year, month): both sides are already monthly ---
@@ -72,6 +100,10 @@ income["fips"] = income["fips"].str.zfill(5)
 final = pd.merge(zillow_long, income, on=["fips", "year", "month"], how="left")
 
 final["price_to_income_ratio"] = final["zhvi"] / final["income_est"]
+final["price_to_household_income_ratio"] = final["zhvi"] / final["household_income_est"]
+# Annualized rent as a share of median household income (0.25 = 25%) -
+# household rather than per-capita income, since rent is paid per household.
+final["rent_to_household_income_ratio"] = final["zori"] * 12 / final["household_income_est"]
 
 final = final[
     [
@@ -87,6 +119,11 @@ final = final[
         "income_est",
         "income_source",
         "price_to_income_ratio",
+        "household_income_est",
+        "household_income_source",
+        "price_to_household_income_ratio",
+        "zori",
+        "rent_to_household_income_ratio",
     ]
 ]
 final = final.sort_values(["fips", "home_type", "date"])

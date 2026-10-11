@@ -1,8 +1,10 @@
+__pycache__/
 data/zillow/*
 outputs/*
 .venv/*
 fred_key.txt
 data/qcew/qcew_*.csv
 data/fred/*.json
+data/fred_household/*.json
 web/data/*.json
 scripts/deploy.env

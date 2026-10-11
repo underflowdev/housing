@@ -12,7 +12,7 @@
 <header id="app-header">
   <h1 id="crumb-title" hidden></h1>
   <nav id="breadcrumb"></nav>
-  <p id="nation-hint" class="hint" hidden>How home prices compare to local income, county by county, since 2000 — click a state to zoom in.</p>
+  <p id="nation-hint" class="hint" hidden>How housing prices compare to local income, county by county, since 2000 — click a state to zoom in.</p>
 </header>
 
 <main id="app-main">
@@ -29,18 +29,18 @@
   <section id="detail-panel" hidden>
     <div id="county-detail" hidden>
       <h2 id="detail-title"></h2>
-      <p id="detail-no-data" class="hint" hidden>No home value data is available for this county.</p>
+      <p id="detail-no-data" class="hint" hidden>No housing price data is available for this county.</p>
       <div id="detail-charts">
         <div class="detail-chart">
-          <div class="detail-chart-title">Home value (ZHVI, $)</div>
-          <svg id="detail-svg-price" class="detail-chart-svg"></svg>
+          <div id="detail-housing-title" class="detail-chart-title">Home value (ZHVI, $)</div>
+          <svg id="detail-svg-housing" class="detail-chart-svg"></svg>
         </div>
         <div class="detail-chart">
-          <div class="detail-chart-title">Per-capita income ($/yr)</div>
+          <div id="detail-income-title" class="detail-chart-title">Income ($/yr)</div>
           <svg id="detail-svg-income" class="detail-chart-svg"></svg>
         </div>
         <div class="detail-chart">
-          <div class="detail-chart-title">Price / income ratio</div>
+          <div id="detail-ratio-title" class="detail-chart-title">Housing price / income ratio</div>
           <svg id="detail-svg-ratio" class="detail-chart-svg"></svg>
         </div>
       </div>
@@ -68,21 +68,38 @@
   <div id="info-row">
     <div id="map-legend" class="legend">
       <div id="toggle-row">
-        <div id="metric-toggle" class="metric-toggle" role="group" aria-label="Map metric">
-          <button type="button" class="metric-btn active" data-metric="ratio">Ratio</button>
-          <button type="button" class="metric-btn" data-metric="price">Price</button>
-          <button type="button" class="metric-btn" data-metric="income">Income</button>
+        <div class="toggle-group">
+          <span class="toggle-label">Housing</span>
+          <div id="housing-toggle" class="metric-toggle" role="group" aria-label="Housing cost measure">
+            <button type="button" class="metric-btn active" data-housing="all_homes">All homes</button>
+            <button type="button" class="metric-btn" data-housing="single_family">Single-family</button>
+            <button type="button" class="metric-btn" data-housing="rent">Rent</button>
+          </div>
         </div>
-        <div id="home-type-toggle" class="metric-toggle" role="group" aria-label="Home type" hidden>
-          <button type="button" class="metric-btn active" data-home-type="all_homes">All homes</button>
-          <button type="button" class="metric-btn" data-home-type="single_family">Single-family</button>
+        <div class="toggle-group">
+          <span class="toggle-label">Income</span>
+          <div id="income-toggle" class="metric-toggle" role="group" aria-label="Income measure">
+            <button type="button" class="metric-btn active" data-income="percapita">Per-capita</button>
+            <button type="button" class="metric-btn" data-income="household">Household</button>
+          </div>
         </div>
-        <div id="scale-toggle" class="metric-toggle" role="group" aria-label="Color scale range" hidden>
-          <button type="button" class="metric-btn active" data-scale="national">National</button>
-          <button type="button" class="metric-btn" data-scale="state">This state</button>
+        <div class="toggle-group">
+          <span class="toggle-label">Map shows</span>
+          <div id="metric-toggle" class="metric-toggle" role="group" aria-label="Map metric">
+            <button type="button" class="metric-btn" data-metric="housing">Housing</button>
+            <button type="button" class="metric-btn" data-metric="income">Income</button>
+            <button type="button" class="metric-btn active" data-metric="ratio">Ratio</button>
+          </div>
+        </div>
+        <div id="scale-toggle-group" class="toggle-group" hidden>
+          <span class="toggle-label">Color scale</span>
+          <div id="scale-toggle" class="metric-toggle" role="group" aria-label="Color scale range">
+            <button type="button" class="metric-btn active" data-scale="national">National</button>
+            <button type="button" class="metric-btn" data-scale="state">This state</button>
+          </div>
         </div>
       </div>
-      <div id="legend-title" class="legend-title">Price / Income ratio</div>
+      <div id="legend-title" class="legend-title">Housing price / income ratio</div>
       <svg id="legend-swatch" height="14"></svg>
       <div class="legend-labels">
         <span id="legend-min"></span>
@@ -96,13 +113,24 @@
       <button class="legend-collapse-toggle" type="button" aria-label="Collapse">−</button>
       <div class="legend-title">Data sources</div>
       <p>
-        Home values: <a href="https://www.zillow.com/research/data/" target="_blank" rel="noopener noreferrer">Data Provided by Zillow Group</a>,
-        income (historical): <a href="https://fred.stlouisfed.org/" target="_blank" rel="noopener noreferrer">U.S. BEA via FRED</a>, Federal Reserve Bank of St. Louis,
-        income (recent-year estimate): <a href="https://www.bls.gov/cew/" target="_blank" rel="noopener noreferrer">U.S. Bureau of Labor Statistics, QCEW</a>,
+        Home values and rents: <a href="https://www.zillow.com/research/data/" target="_blank" rel="noopener noreferrer">Data Provided by Zillow Group</a>,
+        per-capita income (historical): <a href="https://fred.stlouisfed.org/" target="_blank" rel="noopener noreferrer">U.S. BEA via FRED</a>, Federal Reserve Bank of St. Louis,
+        recent-year income estimates (both measures): <a href="https://www.bls.gov/cew/" target="_blank" rel="noopener noreferrer">U.S. Bureau of Labor Statistics, QCEW</a>,
+        household income: <a href="https://fred.stlouisfed.org/release?rid=346" target="_blank" rel="noopener noreferrer">U.S. Census Bureau SAIPE via FRED</a>, Federal Reserve Bank of St. Louis,
         county boundaries: <a href="https://github.com/topojson/us-atlas" target="_blank" rel="noopener noreferrer">us-atlas</a> (US Census Bureau TIGER/Line),
         hosted at: <a href="https://underflow.dev/housing" target="_blank" rel="noopener noreferrer">underflow.dev/housing</a>,
         source code: <a href="https://github.com/underflowdev/housing" target="_blank" rel="noopener noreferrer">GitHub</a>.
       </p>
+      <div class="notes-title">Notes &amp; caveats</div>
+      <ul class="notes-list">
+        <li><strong>Definitely contains inaccuracies.</strong></li>
+        <li><strong>Per-capita income</strong> is a mean (all income incl. investments and transfers, per resident), so very high earners can raise it sharply. <strong>Household income</strong> is a Census median estimate, less precise for small counties.</li>
+        <li>Price / per-capita income compares a home to one person's income, so it runs higher than the usual household-based ratio.</li>
+        <li><strong>Home values</strong> are Zillow estimates of a typical home, not sale prices. <strong>Rent</strong> is typical asking rent on new listings (~1,400 counties, mostly recent years); existing tenants often pay less.</li>
+        <li>The rent ratio uses all households' income; renters typically earn less, so their actual share is higher.</li>
+        <li>Income is annual, interpolated monthly; years not yet published are estimated from each state's wage growth (BLS QCEW), so counties within a state move together in those years (faded in county charts). Dollars are not inflation-adjusted.</li>
+        <li><strong>Gaps:</strong> Connecticut income is estimated after 2021–2023 (switch to planning regions); ~15 Virginia jurisdictions lack per-capita income.</li>
+      </ul>
     </div>
   </div>
 </footer>

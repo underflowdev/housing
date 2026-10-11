@@ -62,76 +62,79 @@ for name in sorted(fred_unmatched)[:15]:
     print("  ", name)
 print()
 
-# --- 2. Zillow counties vs FRED-derived income counties (fips-level) ---
+# --- 2/3. Zillow vs each income measure, fips-level and (fips, year, month)
+# --- tuple-level. income_combined.csv is an OUTER join of two measures with
+# --- very different coverage (per-capita back to FRED's earliest year,
+# --- household only from SAIPE's start year - see build_income.py), so
+# --- checking them separately is the only way these numbers mean anything;
+# --- blending them (e.g. "does this fips have EITHER measure") would credit
+# --- a fips with per-capita coverage just because it happens to have
+# --- household data, or vice versa.
 
 zillow = pd.read_csv(zillow_path, dtype={"StateCodeFIPS": str, "MunicipalCodeFIPS": str})
 zillow = zillow.copy()
 zillow["fips"] = zillow["StateCodeFIPS"].str.zfill(2) + zillow["MunicipalCodeFIPS"].str.zfill(3)
 zillow_fips = set(zillow["fips"])
 
-income = pd.read_csv(income_path, dtype={"fips": str})
+income = pd.read_csv(
+    income_path,
+    dtype={"fips": str, "income_source": str, "household_income_source": str},
+)
 income["fips"] = income["fips"].str.zfill(5)
-income_fips = set(income["fips"])
-
-zillow_only = zillow_fips - income_fips
-income_only = income_fips - zillow_fips
-both = zillow_fips & income_fips
-
-print("=== County (FIPS) coverage: Zillow vs FRED-derived income ===")
-print(f"Zillow counties:                     {len(zillow_fips)}")
-print(f"Income (FRED, FIPS-matched) counties: {len(income_fips)}")
-print(f"In both:                              {len(both)}")
-print(f"In Zillow but no income data at all:  {len(zillow_only)}  (no ratio possible for these, any year)")
-print(f"In income but no Zillow data at all:  {len(income_only)}  (no ratio possible for these, any year)")
-print()
-print("Sample Zillow-only fips (with name):")
-sample = zillow[zillow["fips"].isin(sorted(zillow_only)[:10])][["fips", "RegionName", "StateName"]]
-print(sample.to_string(index=False))
-print()
-
-# --- 3. Row/tuple-level gaps within the overlapping year range ---
-# (restricting to years where FRED has *some* data anywhere, so we're not
-# just counting "Zillow has 2025 data and FRED hasn't published 2025 yet" -
-# a coverage-lag issue, not a join-matching issue.)
-
-min_income_year = int(income["year"].min())
-max_income_year = int(income["year"].max())
 
 DATE_COL_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 date_cols = [c for c in zillow.columns if DATE_COL_RE.match(c)]
-zlong = zillow[["fips"] + date_cols].melt(id_vars="fips", var_name="date", value_name="zhvi")
-zlong["date"] = pd.to_datetime(zlong["date"])
-zlong = zlong[(zlong["date"].dt.year >= min_income_year) & (zlong["date"].dt.year <= max_income_year)]
-zlong["year"] = zlong["date"].dt.year
-zlong["month"] = zlong["date"].dt.month
-z_tuples = zlong[["fips", "year", "month"]].drop_duplicates()
 
-i_tuples = income[["fips", "year", "month"]].drop_duplicates()
 
-merged = pd.merge(z_tuples, i_tuples, on=["fips", "year", "month"], how="outer", indicator=True)
-counts = merged["_merge"].value_counts()
+def report_measure(label, value_col):
+    measure = income[income[value_col].notna()]
+    measure_fips = set(measure["fips"])
 
-print(f"=== (fips, year, month) tuple coverage, restricted to {min_income_year}-{max_income_year} (FRED's full data range) ===")
-print(f"Matched (both):                         {counts.get('both', 0)}")
-print(f"Zillow has a tuple, income is missing:   {counts.get('left_only', 0)}")
-print(f"Income has a tuple, Zillow is missing:   {counts.get('right_only', 0)}")
-print("(Most 'income missing Zillow' here is structural: FRED goes back to 1969,")
-print(" decades before Zillow's data starts in 2000 - not a join defect.)")
-print()
+    zillow_only = zillow_fips - measure_fips
+    measure_only = measure_fips - zillow_fips
+    both = zillow_fips & measure_fips
 
-# Same comparison, but restricted to years where *both* sources could plausibly
-# have data (Zillow's own start year through FRED's latest year) - this is the
-# more meaningful "did the join actually miss something" figure.
-zillow_min_year = int(zlong["year"].min()) if len(date_cols) else min_income_year
-overlap_start = max(min_income_year, 2000)  # Zillow's file starts in 2000
-overlap_end = max_income_year
+    print(f"--- {label}: county (FIPS) coverage vs Zillow ---")
+    print(f"Zillow counties:                        {len(zillow_fips)}")
+    print(f"{label} counties:                        {len(measure_fips)}")
+    print(f"In both:                                 {len(both)}")
+    print(f"In Zillow but no {label} data at all:    {len(zillow_only)}  (no ratio possible for these, any year)")
+    print(f"In {label} but no Zillow data at all:    {len(measure_only)}  (no ratio possible for these, any year)")
+    if zillow_only:
+        print(f"Sample Zillow-only fips (with name), missing from {label}:")
+        sample = zillow[zillow["fips"].isin(sorted(zillow_only)[:10])][["fips", "RegionName", "StateName"]]
+        print(sample.to_string(index=False))
+    print()
 
-o_i_tuples = i_tuples[(i_tuples["year"] >= overlap_start) & (i_tuples["year"] <= overlap_end)]
-o_z_tuples = z_tuples[(z_tuples["year"] >= overlap_start) & (z_tuples["year"] <= overlap_end)]
-overlap_merged = pd.merge(o_z_tuples, o_i_tuples, on=["fips", "year", "month"], how="outer", indicator=True)
-overlap_counts = overlap_merged["_merge"].value_counts()
+    if measure.empty:
+        print(f"({label} has no data at all yet - skipping tuple-level check)")
+        print()
+        return
 
-print(f"=== Same, restricted to the actual overlap range {overlap_start}-{overlap_end} ===")
-print(f"Matched (both):                         {overlap_counts.get('both', 0)}")
-print(f"Zillow has a tuple, income is missing:   {overlap_counts.get('left_only', 0)}")
-print(f"Income has a tuple, Zillow is missing:   {overlap_counts.get('right_only', 0)}")
+    min_year = int(measure["year"].min())
+    max_year = int(measure["year"].max())
+
+    zlong = zillow[["fips"] + date_cols].melt(id_vars="fips", var_name="date", value_name="zhvi")
+    zlong["date"] = pd.to_datetime(zlong["date"])
+    zlong = zlong[(zlong["date"].dt.year >= min_year) & (zlong["date"].dt.year <= max_year)]
+    zlong["year"] = zlong["date"].dt.year
+    zlong["month"] = zlong["date"].dt.month
+    z_tuples = zlong[["fips", "year", "month"]].drop_duplicates()
+
+    i_tuples = measure[["fips", "year", "month"]].drop_duplicates()
+
+    merged = pd.merge(z_tuples, i_tuples, on=["fips", "year", "month"], how="outer", indicator=True)
+    counts = merged["_merge"].value_counts()
+
+    print(f"--- {label}: (fips, year, month) tuple coverage, restricted to {min_year}-{max_year} ({label}'s own data range) ---")
+    print(f"Matched (both):                          {counts.get('both', 0)}")
+    print(f"Zillow has a tuple, {label} is missing:  {counts.get('left_only', 0)}")
+    print(f"{label} has a tuple, Zillow is missing:  {counts.get('right_only', 0)}")
+    print(f"(Zillow starts in 2000; {label} starts in {min_year} - a 'missing Zillow' tuple")
+    print(" before 2000 is structural lag, not a join defect. A large 'missing")
+    print(f" {label}' count within {label}'s own {min_year}-{max_year} range, though, points at a real gap.)")
+    print()
+
+
+report_measure("per-capita income", "income_est")
+report_measure("household income", "household_income_est")

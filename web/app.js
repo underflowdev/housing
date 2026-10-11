@@ -9,11 +9,15 @@ const state = {
   countyFips: null,     // 5-digit, selected for the detail inset
   monthIndex: 0,
   colorMode: "national", // 'national' | 'state' - state view only; nation view is always national
-  metric: "ratio",       // 'ratio' | 'price' | 'income' - what the choropleth and its legend show
-  homeType: "all_homes", // key into data.zhvi - which Zillow home-value series prices/ratios come from
+  // Three independent choices drive the whole UI (map, legend, overview):
+  // which housing-cost measure, which income measure, and which of
+  // housing / income / their ratio the map shows.
+  metric: "ratio",          // 'housing' | 'income' | 'ratio' - what the choropleth and its legend show
+  housing: "all_homes",     // a key into data.zhvi ('all_homes', 'single_family', ...) or 'rent' (data.rent)
+  incomeBasis: "percapita", // 'percapita' | 'household'
 };
 
-let data = null;        // { months, counties, zhvi, income }
+let data = null;        // { months, counties, zhvi, income, householdIncome }
 let rawTopo = null;     // raw TopoJSON topology (needed for mesh())
 let nationGeo = null;   // GeoJSON FeatureCollection, all counties
 let stateGeo = null;    // GeoJSON FeatureCollection, all states
@@ -22,16 +26,52 @@ let countyNameByFips = new Map(); // fips -> {name, state} - every county in the
 let statesByFips = new Map(); // 2-digit fips -> { abbr, geo }
 // Ratio is inherently a relative measure, so its scale is fixed once
 // (computed across all counties/months) and stays comparable at every point
-// on the timeline. Price and income are nominal dollar figures that trend
-// up over the ~25yr range (appreciation/inflation), so a scale fixed like
+// on the timeline. Housing prices (home value or rent) and income are
+// nominal dollar figures that trend up over the ~25yr range (appreciation/inflation), so a scale fixed like
 // ratio's would leave early months uniformly dim and late months uniformly
 // bright - those get a month-relative scale instead (see
 // monthColorScaleCache below).
-let ratioColorScaleCache = new Map(); // homeType -> ratio's fixed nation-wide color scale, built on first use
-let stateColorScaleCache = new Map(); // "homeType:stateFips" -> ratio's own per-state color scale, built on first use
-let monthColorScaleCache = new Map(); // "metric:homeType:scope:monthIndex" -> price/income's per-month color scale, built on first use
+let ratioColorScaleCache = new Map(); // "housing:incomeBasis" -> ratio's fixed nation-wide color scale, built on first use
+let stateColorScaleCache = new Map(); // "housing:incomeBasis:stateFips" -> ratio's own per-state color scale, built on first use
+let monthColorScaleCache = new Map(); // "metric:selection:scope:monthIndex" -> housing/income's per-month color scale, built on first use
 let countyPathSel = null; // d3 selection of the currently-drawn county <path> elements
 let colorModeStateFips = null; // which state colorMode currently applies to (reset on state change)
+let homeTypeLabels = new Map(); // housing key -> its toggle button's display label (e.g. "All homes")
+
+function homeTypeLabel(homeType) {
+  return homeTypeLabels.get(homeType) || homeType;
+}
+
+function isRent() {
+  return state.housing === "rent";
+}
+
+// ---------- labels for the current selections ----------
+// One place for each so the legend, tooltips, and overview cards never
+// disagree about what's being shown.
+
+function housingLabel() {
+  return isRent() ? "Typical asking rent (ZORI, $/mo)" : `Home value (ZHVI, ${homeTypeLabel(state.housing)})`;
+}
+
+function incomeLabel() {
+  return state.incomeBasis === "household" ? "Median household income" : "Mean per-capita income";
+}
+
+function ratioLabel() {
+  const income = state.incomeBasis === "household" ? "median household income" : "mean per-capita income";
+  return isRent() ? `Annual rent / ${income}` : `Home value / ${income}`;
+}
+
+// Price/income is a multiple (e.g. 4.2x); annual rent/income is a share
+// of income (e.g. 23%).
+function fmtRatio(v) {
+  return isRent() ? fmtPercent(v) : v.toFixed(2) + "x";
+}
+
+function fmtHousing(v) {
+  return isRent() ? fmtDollar(v) + "/mo" : fmtDollar(v);
+}
 
 // ---------- boot ----------
 
@@ -55,12 +95,13 @@ Promise.all([
     const fullName = f.properties && f.properties.name ? f.properties.name : f.id;
     statesByFips.set(f.id, { abbr: anyCounty ? anyCounty.state : f.id, name: fullName, geo: f });
   });
-  // The map (TopoJSON) has every US county; Zillow's dataset - and so
-  // byFips - only has the ~3,071 it reports ZHVI for. A handful of small
-  // counties (e.g. Jackson County, CO) are on the map but have no Zillow
-  // data at all, so byFips has nothing for them. This fallback name/state
-  // lookup covers every county on the map, so those still display
-  // sensibly instead of silently failing wherever byFips is checked.
+  // The map (TopoJSON) has every US county; the dataset - and so byFips -
+  // only has counties with Zillow or income data (see web_data_build.py).
+  // A few map counties have neither (e.g. Kalawao County, HI, or Kusilvak
+  // Census Area, AK, whose income is reported under its retired FIPS code),
+  // so byFips has nothing for them. This fallback name/state lookup covers every county on the
+  // map, so those still display sensibly instead of silently failing
+  // wherever byFips is checked.
   nationGeo.features.forEach((f) => {
     if (!countyNameByFips.has(f.id)) {
       const stateAbbr = statesByFips.get(f.id.slice(0, 2));
@@ -74,9 +115,19 @@ Promise.all([
   // data.zhvi is {home_type: matrix} (see web_data_build.py) - default to
   // "all_homes" if present, else whatever home_type the dataset does carry.
   const homeTypes = Object.keys(data.zhvi);
-  state.homeType = homeTypes.includes("all_homes") ? "all_homes" : homeTypes[0];
-  // Only one home-value series to switch between - no point showing the toggle.
-  if (homeTypes.length < 2) document.getElementById("home-type-toggle").remove();
+  state.housing = homeTypes.includes("all_homes") ? "all_homes" : homeTypes[0];
+  // Snapshot each housing option's display label from its toggle button
+  // (e.g. "All homes", "Single-family") - homeTypeLabel() (used by the
+  // detail inset's legend) needs it even for an option removed below.
+  // Then drop buttons for anything this dataset doesn't carry (a home_type
+  // not configured in web_data_build.py, or rent if built without a rent
+  // file) rather than offering an all-gray map.
+  document.querySelectorAll("#housing-toggle .metric-btn").forEach((btn) => {
+    const key = btn.dataset.housing;
+    homeTypeLabels.set(key, btn.textContent);
+    const available = key === "rent" ? !!data.rent : homeTypes.includes(key);
+    if (!available) btn.remove();
+  });
 
   const slider = document.getElementById("timeline-slider");
   slider.max = data.months.length - 1;
@@ -96,33 +147,59 @@ Promise.all([
 
 // ---------- data helpers ----------
 
-function ratioFor(fips, monthIndex) {
-  const entry = byFips.get(fips);
-  if (!entry) return null;
-  const zhvi = data.zhvi[state.homeType][entry.index][monthIndex];
-  if (zhvi == null) return null;
-  const income = data.income[entry.index][monthIndex];
-  if (income == null) return null;
-  return zhvi / income;
+// Values for the current selections, by county row index (see byFips).
+// All return null where the underlying data is missing.
+
+// Selected housing-cost measure: a ZHVI series ($) or ZORI rent ($/mo).
+// data.rent is absent if the dataset was built without a rent file (see
+// web_data_build.py) - the Rent button is removed at boot in that case.
+function housingAt(index, monthIndex) {
+  if (isRent()) return data.rent ? data.rent[index][monthIndex] : null;
+  return data.zhvi[state.housing][index][monthIndex];
 }
 
-function zhviFor(fips, monthIndex) {
-  const entry = byFips.get(fips);
-  if (!entry) return null;
-  return data.zhvi[state.homeType][entry.index][monthIndex];
+// Selected income measure, $/yr.
+function incomeAt(index, monthIndex) {
+  const matrix = state.incomeBasis === "household" ? data.householdIncome : data.income;
+  return matrix[index][monthIndex];
 }
 
-function incomeFor(fips, monthIndex) {
-  const entry = byFips.get(fips);
-  if (!entry) return null;
-  return data.income[entry.index][monthIndex];
+// Housing / income. Rent is annualized first, so the rent ratio is the
+// share of a year's income spent on rent (0.25 = 25%) rather than a
+// monthly-vs-yearly mismatch.
+function ratioAt(index, monthIndex) {
+  const housing = housingAt(index, monthIndex);
+  const income = incomeAt(index, monthIndex);
+  if (housing == null || income == null) return null;
+  return (isRent() ? housing * 12 : housing) / income;
 }
 
 // The value the choropleth colors by, for whichever metric is selected.
 function valueFor(fips, monthIndex, metric) {
-  if (metric === "price") return zhviFor(fips, monthIndex);
-  if (metric === "income") return incomeFor(fips, monthIndex);
-  return ratioFor(fips, monthIndex);
+  const entry = byFips.get(fips);
+  if (!entry) return null;
+  if (metric === "housing") return housingAt(entry.index, monthIndex);
+  if (metric === "income") return incomeAt(entry.index, monthIndex);
+  return ratioAt(entry.index, monthIndex);
+}
+
+// Ratio (a unitless multiple/share, no nominal-dollar drift over time)
+// gets a scale fixed across the whole timeline; dollar metrics get a
+// per-month one - see the comment on ratioColorScaleCache above.
+function isFixedScaleMetric(metric) {
+  return metric === "ratio";
+}
+
+// The selections a metric's values depend on - part of every color-scale
+// cache key, so switching back to an already-viewed combination reuses it.
+function selectionKey(metric) {
+  if (metric === "housing") return state.housing;
+  if (metric === "income") return state.incomeBasis;
+  return state.housing + ":" + state.incomeBasis;
+}
+
+function fmtPercent(v) {
+  return d3.format(".0%")(v);
 }
 
 function latestMonthWithIncomeData() {
@@ -161,14 +238,14 @@ function buildColorScale(metric) {
   return scaleFromSamples(sampleValues(() => true, metric), d3.interpolateBlues);
 }
 
-// Ratio's fixed nation-wide scale depends on the selected home_type (it's
-// derived from zhviFor/ratioFor, which read state.homeType) - cached per
-// home_type so switching back to one already viewed doesn't rebuild it.
-function getRatioColorScale(homeType) {
-  if (!ratioColorScaleCache.has(homeType)) {
-    ratioColorScaleCache.set(homeType, buildColorScale("ratio"));
+// Ratio's fixed nation-wide scale, cached per housing/income combination
+// so switching back to one already viewed doesn't rebuild it.
+function getFixedColorScale(metric) {
+  const key = selectionKey(metric);
+  if (!ratioColorScaleCache.has(key)) {
+    ratioColorScaleCache.set(key, buildColorScale(metric));
   }
-  return ratioColorScaleCache.get(homeType);
+  return ratioColorScaleCache.get(key);
 }
 
 // A state's own counties can have far less spread than the whole country,
@@ -176,17 +253,17 @@ function getRatioColorScale(homeType) {
 // looking nearly uniform. This builds (and caches) ratio's own scale from
 // just that state's own counties, in a visually distinct color scheme so
 // it's never mistaken for the national one.
-function getStateRatioColorScale(stateFips) {
-  const key = state.homeType + ":" + stateFips;
+function getStateFixedColorScale(metric, stateFips) {
+  const key = selectionKey(metric) + ":" + stateFips;
   if (!stateColorScaleCache.has(key)) {
-    const samples = sampleValues((c) => c.fips.slice(0, 2) === stateFips, "ratio");
+    const samples = sampleValues((c) => c.fips.slice(0, 2) === stateFips, metric);
     stateColorScaleCache.set(key, scaleFromSamples(samples, d3.interpolateOranges));
   }
   return stateColorScaleCache.get(key);
 }
 
 // Like sampleValues, but for one specific month rather than sampled across
-// all of them - used to build price/income's per-month scale.
+// all of them - used to build housing/income's per-month scale.
 function sampleValuesForMonth(fipsFilter, metric, monthIndex) {
   const counties = data.counties.filter(fipsFilter);
   const step = Math.max(1, Math.floor(counties.length / 400));
@@ -198,11 +275,11 @@ function sampleValuesForMonth(fipsFilter, metric, monthIndex) {
   return samples;
 }
 
-// Price/income's scale, recalculated for just this month (and, if `stateFips`
+// Housing/income's scale, recalculated for just this month (and, if `stateFips`
 // is given, just that state's counties within it) rather than fixed across
 // the whole timeline - see the comment on monthColorScaleCache above.
 function getMonthColorScale(metric, monthIndex, stateFips) {
-  const key = metric + ":" + state.homeType + ":" + (stateFips || "national") + ":" + monthIndex;
+  const key = metric + ":" + selectionKey(metric) + ":" + (stateFips || "national") + ":" + monthIndex;
   if (!monthColorScaleCache.has(key)) {
     const fipsFilter = stateFips ? (c) => c.fips.slice(0, 2) === stateFips : () => true;
     const samples = sampleValuesForMonth(fipsFilter, metric, monthIndex);
@@ -215,16 +292,17 @@ function getMonthColorScale(metric, monthIndex, stateFips) {
 // The scale actually used to color the map right now. Ratio uses its fixed
 // scale (state-relative variant only when the user has toggled it on for
 // the current state - per requirement, only the state-view toggle can opt
-// into that). Price/income always use this month's scale, national or
+// into that). Housing/income always use this month's scale, national or
 // state-relative depending on the same toggle.
 function activeColorScale() {
   const useStateScale = state.view === "state" && state.colorMode === "state";
-  if (state.metric === "ratio") {
-    return useStateScale ? getStateRatioColorScale(state.stateFips) : getRatioColorScale(state.homeType);
+  if (isFixedScaleMetric(state.metric)) {
+    return useStateScale
+      ? getStateFixedColorScale(state.metric, state.stateFips)
+      : getFixedColorScale(state.metric);
   }
   return getMonthColorScale(state.metric, state.monthIndex, useStateScale ? state.stateFips : null);
 }
-
 function renderLegendSwatch() {
   const scale = activeColorScale();
   const [lo, hi] = scale.domain();
@@ -246,35 +324,31 @@ function renderLegendSwatch() {
       .attr("stop-color", scale(lo + t * (hi - lo)));
   }
   svg.append("rect").attr("width", "100%").attr("height", 14).attr("fill", `url(#${gradId})`);
-  const fmtLegendValue = state.metric === "ratio" ? (v) => v.toFixed(1) + "x" : fmtDollar;
+  const fmtLegendValue =
+    state.metric === "ratio" ? fmtRatio : state.metric === "housing" ? fmtHousing : fmtDollar;
   document.getElementById("legend-min").textContent = fmtLegendValue(lo);
   document.getElementById("legend-max").textContent = fmtLegendValue(hi);
 
   const isStateScale = state.view === "state" && state.colorMode === "state";
   const metricLabel =
-    state.metric === "price"
-      ? "Home value (ZHVI)"
-      : state.metric === "income"
-      ? "Per-capita income"
-      : "Price / Income ratio";
+    state.metric === "housing" ? housingLabel() : state.metric === "income" ? incomeLabel() : ratioLabel();
   document.getElementById("legend-title").textContent =
     metricLabel + (isStateScale ? " — this state" : "");
 
-  document.getElementById("legend-scale-note").hidden = state.metric === "ratio";
+  document.getElementById("legend-scale-note").hidden = isFixedScaleMetric(state.metric);
 
-  // Home type only affects zhvi - irrelevant (and hidden) for the income metric.
-  const homeTypeToggle = document.getElementById("home-type-toggle");
-  if (homeTypeToggle) {
-    homeTypeToggle.hidden = state.metric === "income";
-    homeTypeToggle.querySelectorAll(".metric-btn").forEach((btn) => {
-      btn.classList.toggle("active", btn.dataset.homeType === state.homeType);
-    });
-  }
+  syncToggle("metric-toggle", "metric", state.metric);
+  syncToggle("housing-toggle", "housing", state.housing);
+  syncToggle("income-toggle", "income", state.incomeBasis);
 
-  const scaleToggle = document.getElementById("scale-toggle");
-  scaleToggle.hidden = state.view !== "state";
-  scaleToggle.querySelectorAll(".metric-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.scale === state.colorMode);
+  document.getElementById("scale-toggle-group").hidden = state.view !== "state";
+  syncToggle("scale-toggle", "scale", state.colorMode);
+}
+
+// Marks the button whose data-<attr> matches `value` as active.
+function syncToggle(id, attr, value) {
+  document.querySelectorAll(`#${id} .metric-btn`).forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset[attr] === value);
   });
 }
 
@@ -285,27 +359,41 @@ function setColorMode(mode) {
   updateMapColors();
 }
 
+// Any of the three selections (map metric, housing measure, income
+// measure) changes what the map, legend, county-list graying, and
+// overview cards / county detail charts show - so all three setters share
+// one refresh. The map geometry itself doesn't need rebuilding, only its
+// colors.
+function refreshSelection() {
+  renderLegendSwatch();
+  updateMapColors();
+  if (state.view === "nation") {
+    renderNationalSummary();
+  } else {
+    renderCountyList(document.getElementById("county-search").value.trim().toLowerCase());
+    renderStateSummary();
+    if (state.countyFips) renderDetail();
+  }
+}
+
 function setMetric(metric) {
   if (state.metric === metric) return;
   state.metric = metric;
-  document.querySelectorAll("#metric-toggle .metric-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.metric === metric);
-  });
-  renderLegendSwatch();
-  updateMapColors();
+  refreshSelection();
 }
 
-// Switches which Zillow home-value series (data.zhvi[homeType]) the map,
-// summary stats, county list graying, and detail charts all read from.
-// Touches far more than just map color (ratio/price values themselves
-// change), so this re-renders everything via render() (which itself calls
-// renderMap() -> renderLegendSwatch()/updateMapColors()) rather than just
-// updateMapColors().
-function setHomeType(homeType) {
-  if (state.homeType === homeType) return;
-  state.homeType = homeType;
-  render();
+function setHousing(housing) {
+  if (state.housing === housing) return;
+  state.housing = housing;
+  refreshSelection();
 }
+
+function setIncomeBasis(basis) {
+  if (state.incomeBasis === basis) return;
+  state.incomeBasis = basis;
+  refreshSelection();
+}
+
 
 // ---------- routing (hash-based, safe for static S3 hosting) ----------
 
@@ -361,8 +449,12 @@ function wireControls() {
     btn.addEventListener("click", () => setMetric(btn.dataset.metric));
   });
 
-  document.querySelectorAll("#home-type-toggle .metric-btn").forEach((btn) => {
-    btn.addEventListener("click", () => setHomeType(btn.dataset.homeType));
+  document.querySelectorAll("#housing-toggle .metric-btn").forEach((btn) => {
+    btn.addEventListener("click", () => setHousing(btn.dataset.housing));
+  });
+
+  document.querySelectorAll("#income-toggle .metric-btn").forEach((btn) => {
+    btn.addEventListener("click", () => setIncomeBasis(btn.dataset.income));
   });
 
   document.querySelectorAll("#scale-toggle .metric-btn").forEach((btn) => {
@@ -424,10 +516,11 @@ function setLegendCollapsed(box, toggle, collapsed) {
 function onTimelineChange(fast) {
   updateTimelineLabel();
   updateMapColors(fast);
-  // Ratio's scale is fixed across the timeline, so it never needs a redraw
-  // here; price/income are recalculated per month (see activeColorScale),
-  // so their legend swatch/min/max need to stay in step with the month.
-  if (state.metric !== "ratio") renderLegendSwatch();
+  // Ratio's scale is fixed across the timeline, so it never
+  // needs a redraw here; housing/income are recalculated per month (see
+  // activeColorScale), so their legend swatch/min/max need to stay in step
+  // with the month.
+  if (!isFixedScaleMetric(state.metric)) renderLegendSwatch();
   if (state.view === "nation") {
     renderNationalSummary();
   } else {
@@ -775,15 +868,15 @@ function countyTooltip(fips) {
   const label = `${name}, ${st}`;
   const v = valueFor(fips, state.monthIndex, state.metric);
   if (v == null) return `${label}\nNo data available`;
-  if (state.metric === "price") return `${label}\n${fmtDollar(v)} home value`;
-  if (state.metric === "income") return `${label}\n${fmtDollar(v)} per-capita income`;
-  return `${label}\n${v.toFixed(2)}x price/income`;
+  if (state.metric === "housing") return `${label}\n${housingLabel()}: ${fmtHousing(v)}`;
+  if (state.metric === "income") return `${label}\n${incomeLabel()}: ${fmtDollar(v)}`;
+  return `${label}\n${ratioLabel()}: ${fmtRatio(v)}`;
 }
 
 function selectCounty(fips) {
   state.countyFips = fips;
   // Derive from the FIPS itself (first 2 digits = state), not from
-  // byFips - a county Zillow doesn't cover (e.g. Jackson County, CO)
+  // byFips - a county with no data (e.g. Kalawao County, HI)
   // still has a real state and should still navigate there correctly.
   state.stateFips = fips.slice(0, 2);
   state.view = "state";
@@ -804,7 +897,8 @@ function renderCountyList(filterText) {
   counties.forEach((c) => {
     const li = document.createElement("li");
     li.textContent = c.name;
-    const hasData = ratioFor(c.fips, state.monthIndex) != null;
+    // Grayed to match the map: no data for whatever metric it's showing.
+    const hasData = valueFor(c.fips, state.monthIndex, state.metric) != null;
     if (!hasData) li.classList.add("no-data");
     if (c.fips === state.countyFips) li.classList.add("selected");
     li.addEventListener("click", () => selectCounty(c.fips));
@@ -816,17 +910,23 @@ function renderCountyList(filterText) {
 
 function countyStatsRows(filterFn) {
   return data.counties.filter(filterFn).map((c) => {
-    const entry = byFips.get(c.fips);
-    const zhvi = data.zhvi[state.homeType][entry.index][state.monthIndex];
-    const income = data.income[entry.index][state.monthIndex];
-    const ratio = zhvi != null && income != null ? zhvi / income : null;
-    return { fips: c.fips, name: c.name, state: c.state, zhvi, income, ratio };
+    const index = byFips.get(c.fips).index;
+    return {
+      fips: c.fips,
+      name: c.name,
+      state: c.state,
+      housing: housingAt(index, state.monthIndex),
+      income: incomeAt(index, state.monthIndex),
+      ratio: ratioAt(index, state.monthIndex),
+    };
   });
 }
 
-// Shared by the state and national summaries: renders the coverage /
-// highest-lowest home-value / income / ratio stat cards for whatever set
-// of county rows is passed in.
+// Shared by the state and national summaries: renders a coverage card plus
+// one highest/lowest/average card for each of the current selections -
+// housing measure, income measure, and their ratio - for whatever set of
+// county rows is passed in. Only the selected measures get cards, so the
+// overview always describes exactly what the toggles say.
 // showState: append each named county's state abbreviation (e.g.
 // "Nantucket County, MA") - only meaningful for the national summary,
 // where counties can otherwise be ambiguous (many states have their own
@@ -835,48 +935,42 @@ function countyStatsRows(filterFn) {
 function renderSummaryStatCards(el, rows, avgLabel, totalCount, showState) {
   el.innerHTML = "";
 
-  const withZhvi = rows.filter((r) => r.zhvi != null);
-  const withIncome = rows.filter((r) => r.income != null);
-  const withRatio = rows.filter((r) => r.ratio != null);
+  const cards = [
+    { key: "housing", title: housingLabel(), fmt: fmtHousing, coverageLabel: "Housing cost" },
+    { key: "income", title: incomeLabel(), fmt: fmtDollar, coverageLabel: "Income" },
+    { key: "ratio", title: ratioLabel(), fmt: fmtRatio, coverageLabel: "Ratio" },
+  ].map((card) => ({ ...card, rows: rows.filter((r) => r[card.key] != null) }));
 
-  addStatCard(el, "Coverage this month", [
-    { label: "Counties with a ratio", value: `${withRatio.length} / ${totalCount}`, county: null },
-  ], showState);
+  // Per-measure counts, since they differ a lot - rent (ZORI) covers far
+  // fewer counties than home values, home values thin out in early years,
+  // and income covers some small counties Zillow doesn't - so an average
+  // over 40 counties isn't mistaken for one over 3,000.
+  addStatCard(
+    el,
+    "Counties with data this month",
+    cards.map((card) => ({ label: card.coverageLabel, value: `${card.rows.length} / ${totalCount}`, county: null })),
+    showState
+  );
 
-  if (withZhvi.length) {
-    const avgZhvi = withZhvi.reduce((sum, r) => sum + r.zhvi, 0) / withZhvi.length;
-    addStatCard(el, "Home value (ZHVI)", [
-      { label: "Highest", value: fmtDollar(maxBy(withZhvi, "zhvi").zhvi), county: maxBy(withZhvi, "zhvi") },
-      { label: "Lowest", value: fmtDollar(minBy(withZhvi, "zhvi").zhvi), county: minBy(withZhvi, "zhvi") },
-      { label: avgLabel, value: fmtDollar(avgZhvi), county: null },
+  cards.forEach(({ key, title, fmt, rows: withValue }) => {
+    if (!withValue.length) return;
+    const avg = withValue.reduce((sum, r) => sum + r[key], 0) / withValue.length;
+    const highest = maxBy(withValue, key);
+    const lowest = minBy(withValue, key);
+    addStatCard(el, title, [
+      { label: "Highest", value: fmt(highest[key]), county: highest },
+      { label: "Lowest", value: fmt(lowest[key]), county: lowest },
+      { label: avgLabel, value: fmt(avg), county: null },
     ], showState);
-  }
-
-  if (withIncome.length) {
-    const avgIncome = withIncome.reduce((sum, r) => sum + r.income, 0) / withIncome.length;
-    addStatCard(el, "Per-capita income", [
-      { label: "Highest", value: fmtDollar(maxBy(withIncome, "income").income), county: maxBy(withIncome, "income") },
-      { label: "Lowest", value: fmtDollar(minBy(withIncome, "income").income), county: minBy(withIncome, "income") },
-      { label: avgLabel, value: fmtDollar(avgIncome), county: null },
-    ], showState);
-  }
-
-  if (withRatio.length) {
-    const avgRatio = withRatio.reduce((sum, r) => sum + r.ratio, 0) / withRatio.length;
-    addStatCard(el, "Price / income ratio", [
-      { label: "Highest", value: maxBy(withRatio, "ratio").ratio.toFixed(2) + "x", county: maxBy(withRatio, "ratio") },
-      { label: "Lowest", value: minBy(withRatio, "ratio").ratio.toFixed(2) + "x", county: minBy(withRatio, "ratio") },
-      { label: avgLabel, value: avgRatio.toFixed(2) + "x", county: null },
-    ], showState);
-  }
+  });
 }
 
 function renderStateSummary() {
   document.getElementById("overview-title").textContent = stateName(state.stateFips) + " overview";
   const rows = countyStatsRows((c) => c.fips.slice(0, 2) === state.stateFips);
   // Total counties in this state per the map (every real county), not per
-  // Zillow's list - Zillow doesn't cover every county (e.g. Jackson County,
-  // CO), so using data.counties.length as the denominator understated the
+  // data.counties - not every county has data (e.g. Kalawao County, HI),
+  // so using data.counties.length as the denominator understated the
   // true gap and could read as "100% coverage" when it wasn't.
   const totalCount = nationGeo.features.filter((f) => f.id.slice(0, 2) === state.stateFips).length;
   renderSummaryStatCards(document.getElementById("overview-stats"), rows, "State average", totalCount, false);
@@ -940,11 +1034,25 @@ function addStatCard(container, title, items, showState) {
   container.appendChild(card);
 }
 
-// ---------- detail inset (dual-line chart: zhvi + income, real values) ----------
+// ---------- detail inset (housing / income / ratio charts for the current selections) ----------
 
 const PRICE_COLOR = "#2b6cb0";
+const RENT_COLOR = "#2f855a";
 const INCOME_COLOR = "#d69e2e";
+const HOUSEHOLD_INCOME_COLOR = "#c53030";
 const RATIO_COLOR = "#2c7a7b";
+
+// Each selection keeps its own stable color, so switching the Housing or
+// Income toggle visibly changes the line rather than silently swapping the
+// data under the same-looking trace.
+function housingColor() {
+  if (isRent()) return RENT_COLOR;
+  return state.housing === "all_homes" ? PRICE_COLOR : "#805ad5";
+}
+
+function incomeColor() {
+  return state.incomeBasis === "household" ? HOUSEHOLD_INCOME_COLOR : INCOME_COLOR;
+}
 
 // x scale shared by all three mini-charts (same domain/range for all three,
 // since they're drawn at the same width with the same margins) - stashed so
@@ -952,6 +1060,10 @@ const RATIO_COLOR = "#2c7a7b";
 // the whole layout on every month change.
 let detailXScale = null;
 
+// Draws the selected county's history for exactly what the toggles have
+// selected - the same housing measure, income measure, and ratio the map
+// and overview show - so the three views never describe different things.
+// Redrawn by refreshSelection() whenever a selection changes.
 function renderDetail() {
   const { name, state: st } = countyDisplayInfo(state.countyFips);
   document.getElementById("detail-title").textContent = `${name}, ${st}`;
@@ -961,7 +1073,7 @@ function renderDetail() {
   const chartsEl = document.getElementById("detail-charts");
   const legendEl = document.getElementById("detail-legend");
   if (!entry) {
-    // Zillow doesn't cover every county (e.g. Jackson County, CO) - say so
+    // A county with neither Zillow nor income data - say so
     // plainly instead of leaving the charts blank or showing a stale
     // previous county's data.
     noDataEl.hidden = false;
@@ -975,42 +1087,44 @@ function renderDetail() {
   legendEl.hidden = false;
 
   const months = data.months;
-  const zhviSeries = months.map((m, i) => data.zhvi[state.homeType][entry.index][i]);
-  const incomeSeries = months.map((m, i) => data.income[entry.index][i]);
-  const ratioSeries = months.map((m, i) =>
-    zhviSeries[i] != null && incomeSeries[i] != null ? zhviSeries[i] / incomeSeries[i] : null
-  );
+  const housingSeries = months.map((m, i) => housingAt(entry.index, i));
+  const incomeSeries = months.map((m, i) => incomeAt(entry.index, i));
+  const ratioSeries = months.map((m, i) => ratioAt(entry.index, i));
 
-  // Years extrapolated from a QCEW growth rate rather than a real published
-  // FRED figure - flagged so the charts don't present an estimate as if it
-  // were identical to real data (see build_income.py / web_data_build.py).
-  // The ratio inherits the same flag wherever it depends on an estimated
-  // income figure.
-  const estimatedYears = new Set(data.incomeEstimatedYears[state.countyFips] || []);
+  // Years extrapolated from a growth rate rather than a real published
+  // figure - flagged so the charts don't present an estimate as if it were
+  // identical to real data (see build_income.py / web_data_build.py). Each
+  // income measure has its own estimated-years set (they lag differently);
+  // the ratio inherits the flag from the income it divides by.
+  const estimatedYearsByFips =
+    state.incomeBasis === "household" ? data.householdIncomeEstimatedYears : data.incomeEstimatedYears;
+  const estimatedYears = new Set(estimatedYearsByFips[state.countyFips] || []);
   const isEstimated = (i) => estimatedYears.has(+months[i].slice(0, 4));
-  let lastRealIndex = -1;
-  for (let i = 0; i < months.length; i++) {
-    if (incomeSeries[i] != null && !isEstimated(i)) lastRealIndex = i;
-  }
 
   // All three charts share this width/margin, so one x scale (stashed in
   // detailXScale) positions every chart's marker line identically.
-  const sampleSvg = document.getElementById("detail-svg-price");
+  const sampleSvg = document.getElementById("detail-svg-housing");
   const width = sampleSvg.getBoundingClientRect().width || 340;
   const margin = { top: 8, right: 54, bottom: 4, left: 54 };
   const x = d3.scaleLinear().domain([0, months.length - 1]).range([margin.left, width - margin.right]);
   detailXScale = x;
 
-  drawMiniChart("detail-svg-price", {
+  // Rent (ZORI) covers far fewer counties than home values - say so in the
+  // title rather than leaving an unexplained empty chart.
+  const hasHousing = housingSeries.some((v) => v != null);
+  document.getElementById("detail-housing-title").textContent =
+    housingLabel() + (hasHousing ? "" : " — no data for this county");
+  drawMiniChart("detail-svg-housing", {
     width,
     margin,
     x,
     months,
     showXAxis: false,
-    yFormat: (d) => "$" + d3.format(".2s")(d),
-    series: [{ values: zhviSeries, color: PRICE_COLOR, dash: false }],
+    yFormat: isRent() ? (d) => "$" + d3.format(",.0f")(d) : (d) => "$" + d3.format(".2s")(d),
+    series: [{ values: housingSeries, color: housingColor(), dash: false }],
   });
 
+  document.getElementById("detail-income-title").textContent = incomeLabel() + " ($/yr)";
   drawMiniChart("detail-svg-income", {
     width,
     margin,
@@ -1018,20 +1132,10 @@ function renderDetail() {
     months,
     showXAxis: false,
     yFormat: (d) => "$" + d3.format(".2s")(d),
-    series: [
-      { values: incomeSeries, color: INCOME_COLOR, dash: true, defined: (i) => incomeSeries[i] != null && !isEstimated(i) },
-      {
-        values: incomeSeries,
-        color: INCOME_COLOR,
-        dash: true,
-        faint: true,
-        // Overlaps the real line's last point so the estimated tail
-        // connects visually instead of leaving a gap.
-        defined: (i) => incomeSeries[i] != null && (isEstimated(i) || i === lastRealIndex),
-      },
-    ],
+    series: realAndEstimatedSeries(incomeSeries, incomeColor(), isEstimated),
   });
 
+  document.getElementById("detail-ratio-title").textContent = ratioLabel();
   drawMiniChart("detail-svg-ratio", {
     width,
     // Only margin.left/right need to match the other charts (that's what
@@ -1041,21 +1145,37 @@ function renderDetail() {
     x,
     months,
     showXAxis: true,
-    yFormat: (d) => d3.format(".1f")(d) + "x",
-    series: [
-      { values: ratioSeries, color: RATIO_COLOR, dash: false, defined: (i) => ratioSeries[i] != null && !isEstimated(i) },
-      {
-        values: ratioSeries,
-        color: RATIO_COLOR,
-        dash: false,
-        faint: true,
-        defined: (i) => ratioSeries[i] != null && (isEstimated(i) || i === lastRealIndex),
-      },
-    ],
+    yFormat: isRent() ? (d) => d3.format(".0%")(d) : (d) => d3.format(".1f")(d) + "x",
+    series: realAndEstimatedSeries(ratioSeries, RATIO_COLOR, isEstimated),
   });
 
   renderDetailMarker();
   renderDetailLegend(estimatedYears.size > 0);
+}
+
+// A line split into its real portion and a faint estimated tail, the tail
+// overlapping the last real point so the two connect visually instead of
+// leaving a gap.
+function realAndEstimatedSeries(values, color, isEstimated) {
+  const real = { values, color, dash: false, defined: (i) => values[i] != null && !isEstimated(i) };
+  // No estimated points at all - skip the tail series entirely, or its
+  // last-real-point overlap below would be a lone point that drawMiniChart
+  // marks with a dot at the end of every fully-real line.
+  if (!values.some((v, i) => v != null && isEstimated(i))) return [real];
+  let lastRealIndex = -1;
+  for (let i = 0; i < values.length; i++) {
+    if (values[i] != null && !isEstimated(i)) lastRealIndex = i;
+  }
+  return [
+    real,
+    {
+      values,
+      color,
+      dash: false,
+      faint: true,
+      defined: (i) => values[i] != null && (isEstimated(i) || i === lastRealIndex),
+    },
+  ];
 }
 
 // Draws one of the three stacked mini-charts: a single y-axis, one or more
@@ -1099,9 +1219,10 @@ function drawMiniChart(svgId, { width, margin, x, months, showXAxis, yFormat, se
     .call(d3.axisRight(y).ticks(4).tickFormat(yFormat));
 
   series.forEach((s) => {
+    const defined = (i) => (s.defined ? s.defined(i) : s.values[i] != null);
     const line = d3
       .line()
-      .defined((d, i) => (s.defined ? s.defined(i) : s.values[i] != null))
+      .defined((d, i) => defined(i))
       .x((d, i) => x(i))
       .y((d, i) => y(s.values[i]));
     g.append("path")
@@ -1112,6 +1233,24 @@ function drawMiniChart(svgId, { width, margin, x, months, showXAxis, yFormat, se
       .attr("stroke-opacity", s.faint ? 0.55 : 1)
       .attr("stroke-dasharray", s.dash ? (s.faint ? "1,2" : "4,2") : null)
       .attr("d", line);
+
+    // d3.line() only draws segments between consecutive defined points, so
+    // a month with no defined neighbor on either side renders as nothing -
+    // e.g. a county whose ZORI rent series is a single month so far (common:
+    // Zillow keeps adding counties), or a point stranded by a gap. The map
+    // still colors that month, so draw it here as a dot rather than
+    // silently showing an empty chart.
+    const isolated = months
+      .map((m, i) => i)
+      .filter((i) => defined(i) && !(i > 0 && defined(i - 1)) && !(i < months.length - 1 && defined(i + 1)));
+    g.selectAll(null)
+      .data(isolated)
+      .join("circle")
+      .attr("cx", (i) => x(i))
+      .attr("cy", (i) => y(s.values[i]))
+      .attr("r", 2.5)
+      .attr("fill", s.color)
+      .attr("fill-opacity", s.faint ? 0.55 : 1);
   });
 
   g.append("line")
@@ -1133,16 +1272,15 @@ function renderDetailLegend(hasEstimatedYears) {
   const el = document.getElementById("detail-legend");
   el.innerHTML = "";
   const rows = [
-    { color: PRICE_COLOR, dash: false, label: "Home value (ZHVI, $)" },
-    { color: INCOME_COLOR, dash: true, label: "Per-capita income ($/yr)" },
-    { color: RATIO_COLOR, dash: false, label: "Price / income ratio" },
+    { color: housingColor(), label: housingLabel() },
+    { color: incomeColor(), label: incomeLabel() + " ($/yr)" },
+    { color: RATIO_COLOR, label: ratioLabel() },
   ];
   if (hasEstimatedYears) {
     rows.push({
-      color: INCOME_COLOR,
-      dash: true,
+      color: incomeColor(),
       faint: true,
-      label: "Income & ratio, estimated (no published income figure yet)",
+      label: "Income & ratio, estimated (no published figure yet)",
     });
   }
   rows.forEach((r) => {
